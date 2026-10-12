@@ -295,7 +295,7 @@ fun TrackerScreen(
                     MetricCard(
                         title = activity.name,
                         value = "$currentCount",
-                        unit = "${activity.unit} /$goal",
+                        unit = "${activity.unit} / $goal",
                         progress = if (goal > 0) currentCount.toFloat() / goal else 0f,
                         icon = Icons.Rounded.FitnessCenter,
                         containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
@@ -504,4 +504,127 @@ fun AddCustomActivityDialog(
         onDismissRequest = onDismiss,
         title = { Text("Новая активность") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(1
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Название (например, Планка)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp)
+                )
+                OutlinedTextField(
+                    value = unit,
+                    onValueChange = { unit = it },
+                    label = { Text("Единица (сек, раз, км)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp)
+                )
+                OutlinedTextField(
+                    value = goalText,
+                    onValueChange = { goalText = it.filter { char -> char.isDigit() } },
+                    label = { Text("Цель на день") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp)
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                val goal = goalText.toIntOrNull() ?: 50
+                if (name.isNotBlank()) {
+                    onConfirm(name.trim(), unit.trim(), goal)
+                }
+            }) { Text("Создать") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } },
+        shape = RoundedCornerShape(28.dp)
+    )
+}
+
+@Composable
+fun SetGoalsDialog(
+    currentPushUpsGoal: Int,
+    currentSquatsGoal: Int,
+    currentStepsGoal: Int,
+    currentDistanceGoal: Float,
+    onDismiss: () -> Unit,
+    onConfirm: (pushUps: Int, squats: Int, steps: Int, distanceKm: Float) -> Unit
+) {
+    var pGoal by remember { mutableIntStateOf(currentPushUpsGoal) }
+    var sGoal by remember { mutableIntStateOf(currentSquatsGoal) }
+    var stGoal by remember { mutableIntStateOf(currentStepsGoal) }
+    var dGoalText by remember { mutableStateOf("$currentDistanceGoal") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Настройка целей") },
+        text = {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                GoalAdjusterRow(label = "Шаги", value = stGoal, onValueChange = { stGoal = it })
+                
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(text = "Километры", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                    OutlinedTextField(
+                        value = dGoalText,
+                        onValueChange = { dGoalText = it.filter { char -> char.isDigit() || char == '.' } },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                }
+
+                GoalAdjusterRow(label = "Отжимания", value = pGoal, onValueChange = { pGoal = it })
+                GoalAdjusterRow(label = "Приседания", value = sGoal, onValueChange = { sGoal = it })
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                val dVal = dGoalText.toFloatOrNull() ?: 5.0f
+                onConfirm(pGoal, sGoal, stGoal, dVal)
+            }) { Text("Сохранить") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } },
+        shape = RoundedCornerShape(28.dp)
+    )
+}
+
+@Composable
+fun GoalAdjusterRow(label: String, value: Int, onValueChange: (Int) -> Unit) {
+    var textValue by remember(value) { mutableStateOf("$value") }
+
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(text = label, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilledIconButton(
+                onClick = { onValueChange(maxOf(1, value - 1)) },
+                shape = RoundedCornerShape(12.dp),
+                colors = IconButtonDefaults.filledIconButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) { Text("-", style = MaterialTheme.typography.titleLarge) }
+
+            OutlinedTextField(
+                value = textValue,
+                onValueChange = { newText ->
+                    val filtered = newText.filter { it.isDigit() }
+                    textValue = filtered
+                    val parsed = filtered.toIntOrNull()
+                    if (parsed != null && parsed >= 1) onValueChange(parsed)
+                },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(12.dp)
+            )
+
+            FilledIconButton(
+                onClick = { onValueChange(value + 1) },
+                shape = RoundedCornerShape(12.dp),
+                colors = IconButtonDefaults.filledIconButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) { Text("+", style = MaterialTheme.typography.titleLarge) }
+        }
+    }
+}
