@@ -7,9 +7,9 @@ import android.content.Context
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
-import androidx.activity.enableEdgeToEdge
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -31,6 +31,7 @@ import androidx.compose.material.icons.rounded.Map
 import androidx.compose.material.icons.rounded.Note
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -47,6 +48,8 @@ import com.example.pixeltracker.ui.HistoryScreen
 import com.example.pixeltracker.ui.NotesScreen
 import com.example.pixeltracker.ui.TrackerViewModel
 import com.example.pixeltracker.worker.ReminderWorker
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.util.concurrent.TimeUnit
 
 enum class Screen { Main, History, Notes }
@@ -144,6 +147,9 @@ fun TrackerScreen(
     val customActivities by viewModel.customActivities.collectAsState()
     val customProgress by viewModel.todayCustomProgress.collectAsState()
 
+    var isRefreshing by remember { mutableStateOf(false) }
+    val coroutineScope = rememberCoroutineScope()
+
     var activeDialogExercise by remember { mutableStateOf<ExerciseType?>(null) }
     var showGoalDialog by remember { mutableStateOf(false) }
     var showAddActivityDialog by remember { mutableStateOf(false) }
@@ -217,74 +223,89 @@ fun TrackerScreen(
             )
         }
     ) { innerPadding ->
-        Column(
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = {
+                isRefreshing = true
+                viewModel.refreshData()
+                coroutineScope.launch {
+                    delay(600)
+                    isRefreshing = false
+                }
+            },
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .padding(horizontal = 20.dp)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            MetricCard(
-                title = "Шаги",
-                value = "$stepsCount",
-                unit = "/ $stepsGoal",
-                progress = if (stepsGoal > 0) stepsCount.toFloat() / stepsGoal else 0f,
-                icon = Icons.Rounded.DirectionsWalk,
-                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-            )
-
-            MetricCard(
-                title = "Километры",
-                value = "$distanceKm",
-                unit = "км / $distanceGoalKm км",
-                progress = if (distanceGoalKm > 0f) distanceKm / distanceGoalKm else 0f,
-                icon = Icons.Rounded.Map,
-                containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                contentColor = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-
-            MetricCard(
-                title = "Отжимания",
-                value = "$pushUpsCount",
-                unit = "/ $pushUpsGoal",
-                progress = if (pushUpsGoal > 0) pushUpsCount.toFloat() / pushUpsGoal else 0f,
-                icon = Icons.Rounded.FitnessCenter,
-                containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                onActionClick = { activeDialogExercise = ExerciseType.PushUps }
-            )
-
-            MetricCard(
-                title = "Приседания",
-                value = "$squatsCount",
-                unit = "/ $squatsGoal",
-                progress = if (squatsGoal > 0) squatsCount.toFloat() / squatsGoal else 0f,
-                icon = Icons.Rounded.DirectionsRun,
-                containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-                contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
-                onActionClick = { activeDialogExercise = ExerciseType.Squats }
-            )
-
-            customActivities.forEach { activity ->
-                val progressItem = customProgress.find { it.activityId == activity.id }
-                val currentCount = progressItem?.currentCount ?: 0
-                val goal = progressItem?.goalCount ?: activity.defaultGoal
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 20.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Spacer(modifier = Modifier.height(4.dp))
+                MetricCard(
+                    title = "Шаги",
+                    value = "$stepsCount",
+                    unit = "/ $stepsGoal",
+                    progress = if (stepsGoal > 0) stepsCount.toFloat() / stepsGoal else 0f,
+                    icon = Icons.Rounded.DirectionsWalk,
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                )
 
                 MetricCard(
-                    title = activity.name,
-                    value = "$currentCount",
-                    unit = "${activity.unit} / $goal",
-                    progress = if (goal > 0) currentCount.toFloat() / goal else 0f,
-                    icon = Icons.Rounded.FitnessCenter,
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                    contentColor = MaterialTheme.colorScheme.onSurface,
-                    onActionClick = { selectedCustomActivityId = activity.id }
+                    title = "Километры",
+                    value = "$distanceKm",
+                    unit = "км / $distanceGoalKm км",
+                    progress = if (distanceGoalKm > 0f) distanceKm / distanceGoalKm else 0f,
+                    icon = Icons.Rounded.Map,
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-            }
 
-            Spacer(modifier = Modifier.height(20.dp))
+                MetricCard(
+                    title = "Отжимания",
+                    value = "$pushUpsCount",
+                    unit = "/ $pushUpsGoal",
+                    progress = if (pushUpsGoal > 0) pushUpsCount.toFloat() / pushUpsGoal else 0f,
+                    icon = Icons.Rounded.FitnessCenter,
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    onActionClick = { activeDialogExercise = ExerciseType.PushUps }
+                )
+
+                MetricCard(
+                    title = "Приседания",
+                    value = "$squatsCount",
+                    unit = "/ $squatsGoal",
+                    progress = if (squatsGoal > 0) squatsCount.toFloat() / squatsGoal else 0f,
+                    icon = Icons.Rounded.DirectionsRun,
+                    containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+                    onActionClick = { activeDialogExercise = ExerciseType.Squats }
+                )
+
+                customActivities.forEach { activity ->
+                    val progressItem = customProgress.find { it.activityId == activity.id }
+                    val currentCount = progressItem?.currentCount ?: 0
+                    val goal = progressItem?.goalCount ?: activity.defaultGoal
+
+                    MetricCard(
+                        title = activity.name,
+                        value = "$currentCount",
+                        unit = "${activity.unit} /$goal",
+                        progress = if (goal > 0) currentCount.toFloat() / goal else 0f,
+                        icon = Icons.Rounded.FitnessCenter,
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                        contentColor = MaterialTheme.colorScheme.onSurface,
+                        onActionClick = { selectedCustomActivityId = activity.id }
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+            }
         }
 
         activeDialogExercise?.let { exercise ->
@@ -483,127 +504,4 @@ fun AddCustomActivityDialog(
         onDismissRequest = onDismiss,
         title = { Text("Новая активность") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text("Название (например, Планка)") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp)
-                )
-                OutlinedTextField(
-                    value = unit,
-                    onValueChange = { unit = it },
-                    label = { Text("Единица (сек, раз, км)") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp)
-                )
-                OutlinedTextField(
-                    value = goalText,
-                    onValueChange = { goalText = it.filter { char -> char.isDigit() } },
-                    label = { Text("Цель на день") },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp)
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = {
-                val goal = goalText.toIntOrNull() ?: 50
-                if (name.isNotBlank()) {
-                    onConfirm(name.trim(), unit.trim(), goal)
-                }
-            }) { Text("Создать") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } },
-        shape = RoundedCornerShape(28.dp)
-    )
-}
-
-@Composable
-fun SetGoalsDialog(
-    currentPushUpsGoal: Int,
-    currentSquatsGoal: Int,
-    currentStepsGoal: Int,
-    currentDistanceGoal: Float,
-    onDismiss: () -> Unit,
-    onConfirm: (pushUps: Int, squats: Int, steps: Int, distanceKm: Float) -> Unit
-) {
-    var pGoal by remember { mutableIntStateOf(currentPushUpsGoal) }
-    var sGoal by remember { mutableIntStateOf(currentSquatsGoal) }
-    var stGoal by remember { mutableIntStateOf(currentStepsGoal) }
-    var dGoalText by remember { mutableStateOf("$currentDistanceGoal") }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Настройка целей") },
-        text = {
-            Column(modifier = Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                GoalAdjusterRow(label = "Шаги", value = stGoal, onValueChange = { stGoal = it })
-                
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(text = "Километры", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                    OutlinedTextField(
-                        value = dGoalText,
-                        onValueChange = { dGoalText = it.filter { char -> char.isDigit() || char == '.' } },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp)
-                    )
-                }
-
-                GoalAdjusterRow(label = "Отжимания", value = pGoal, onValueChange = { pGoal = it })
-                GoalAdjusterRow(label = "Приседания", value = sGoal, onValueChange = { sGoal = it })
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = {
-                val dVal = dGoalText.toFloatOrNull() ?: 5.0f
-                onConfirm(pGoal, sGoal, stGoal, dVal)
-            }) { Text("Сохранить") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } },
-        shape = RoundedCornerShape(28.dp)
-    )
-}
-
-@Composable
-fun GoalAdjusterRow(label: String, value: Int, onValueChange: (Int) -> Unit) {
-    var textValue by remember(value) { mutableStateOf("$value") }
-
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(text = label, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilledIconButton(
-                onClick = { onValueChange(maxOf(1, value - 1)) },
-                shape = RoundedCornerShape(12.dp),
-                colors = IconButtonDefaults.filledIconButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-            ) { Text("-", style = MaterialTheme.typography.titleLarge) }
-
-            OutlinedTextField(
-                value = textValue,
-                onValueChange = { newText ->
-                    val filtered = newText.filter { it.isDigit() }
-                    textValue = filtered
-                    val parsed = filtered.toIntOrNull()
-                    if (parsed != null && parsed >= 1) onValueChange(parsed)
-                },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(12.dp)
-            )
-
-            FilledIconButton(
-                onClick = { onValueChange(value + 1) },
-                shape = RoundedCornerShape(12.dp),
-                colors = IconButtonDefaults.filledIconButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-            ) { Text("+", style = MaterialTheme.typography.titleLarge) }
-        }
-    }
-}
+            Column(verticalArrangement = Arrangement.spacedBy(1
