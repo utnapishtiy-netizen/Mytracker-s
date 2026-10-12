@@ -136,7 +136,6 @@ fun NoteCard(note: NoteEntity, onDelete: () -> Unit) {
                 )
             }
 
-            // Индикатор даты и времени
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
