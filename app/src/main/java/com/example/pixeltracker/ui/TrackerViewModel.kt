@@ -162,6 +162,13 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    fun refreshData() {
+        viewModelScope.launch {
+            stepCounterManager.refresh()
+            triggerWidgetUpdate()
+        }
+    }
+
     fun addCustomProgress(activityId: Long, count: Int, goal: Int) {
         viewModelScope.launch {
             val currentList = todayCustomProgress.value
