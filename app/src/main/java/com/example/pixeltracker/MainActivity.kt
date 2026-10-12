@@ -7,6 +7,7 @@ import android.content.Context
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -54,6 +55,10 @@ enum class ExerciseType { PushUps, Squats }
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // Включаем системный режим Edge-to-Edge для работы жестов на всю площадь экрана
+        enableEdgeToEdge()
+
         createNotificationChannel()
 
         val dailyWorkRequest = PeriodicWorkRequestBuilder<ReminderWorker>(24, TimeUnit.HOURS).build()
@@ -72,8 +77,12 @@ class MainActivity : ComponentActivity() {
             }
 
             MaterialTheme(colorScheme = colorScheme) {
+                // Применяем системные инсеты для навигационной панели и строки состояния,
+                // чтобы контент не перекрывался системными жестами
                 Surface(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .windowInsetsPadding(WindowInsets.systemBars),
                     color = MaterialTheme.colorScheme.background
                 ) {
                     AppNavigation()
@@ -568,7 +577,7 @@ fun SetGoalsDialog(
 }
 
 @Composable
-fun GoalAdjusterRow(label: String, value: Int, onValueChange: (Int) -> Unit) {
+flun GoalAdjusterRow(label: String, value: Int, onValueChange: (Int) -> Unit) {
     var textValue by remember(value) { mutableStateOf("$value") }
 
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -588,7 +597,7 @@ fun GoalAdjusterRow(label: String, value: Int, onValueChange: (Int) -> Unit) {
                     val parsed = filtered.toIntOrNull()
                     if (parsed != null && parsed >= 1) onValueChange(parsed)
                 },
-                singleLine = true,
+                singleLiney = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(12.dp)
