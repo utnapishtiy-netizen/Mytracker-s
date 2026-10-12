@@ -8,6 +8,7 @@ import com.example.pixeltracker.data.AppDatabase
 import com.example.pixeltracker.data.ActivityProgressEntity
 import com.example.pixeltracker.data.CustomActivityEntity
 import com.example.pixeltracker.data.DailyTracker
+import com.example.pixeltracker.data.NoteEntity
 import com.example.pixeltracker.sensor.StepCounterManager
 import com.example.pixeltracker.widget.PushUpWidget
 import kotlinx.coroutines.flow.*
@@ -16,27 +17,10 @@ import java.time.LocalDate
 
 class TrackerViewModel(application: Application) : AndroidViewModel(application) {
     private val dao = AppDatabase.getDatabase(application).trackerDao()
+    private val noteDao = AppDatabase.getDatabase(application).noteDao()
     private val todayDateString = LocalDate.now().toString()
 
     val stepCounterManager = StepCounterManager(application)
-
-    private val noteDao = AppDatabase.getDatabase(application).noteDao()
-
-    val notes: StateFlow<List<NoteEntity>> = noteDao.getAllNotes()
-        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
-
-    fun addNote(title: String, content: String) {
-        if (title.isBlank() && content.isBlank()) return
-        viewModelScope.launch {
-            noteDao.insertNote(NoteEntity(title = title.trim(), content = content.trim()))
-        }
-    }
-
-    fun deleteNote(note: NoteEntity) {
-        viewModelScope.launch {
-            noteDao.deleteNote(note)
-        }
-    }
 
     val todayTracker: StateFlow<DailyTracker?> = dao.getTrackerByDate(todayDateString)
         .stateIn(viewModelScope, SharingStarted.Lazily, null)
@@ -72,6 +56,10 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
     val allHistory: StateFlow<List<DailyTracker>> = dao.getAllTrackers()
+        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    // Заметки
+    val notes: StateFlow<List<NoteEntity>> = noteDao.getAllNotes()
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
     val currentStreak: StateFlow<Int> = allHistory.map { history ->
@@ -197,6 +185,20 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
                 )
             )
             triggerWidgetUpdate()
+        }
+    }
+
+    // Методы для заметок
+    fun addNote(title: String, content: String) {
+        if (title.isBlank() && content.isBlank()) return
+        viewModelScope.launch {
+            noteDao.insertNote(NoteEntity(title = title.trim(), content = content.trim()))
+        }
+    }
+
+    fun deleteNote(note: NoteEntity) {
+        viewModelScope.launch {
+            noteDao.deleteNote(note)
         }
     }
 
