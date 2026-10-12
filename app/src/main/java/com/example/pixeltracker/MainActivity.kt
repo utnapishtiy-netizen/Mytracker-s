@@ -27,6 +27,7 @@ import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.FitnessCenter
 import androidx.compose.material.icons.rounded.LocalFireDepartment
 import androidx.compose.material.icons.rounded.Map
+import androidx.compose.material.icons.rounded.Note
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -42,11 +43,12 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import com.example.pixeltracker.ui.HistoryScreen
+import com.example.pixeltracker.ui.NotesScreen
 import com.example.pixeltracker.ui.TrackerViewModel
 import com.example.pixeltracker.worker.ReminderWorker
 import java.util.concurrent.TimeUnit
 
-enum class Screen { Main, History }
+enum class Screen { Main, History, Notes }
 enum class ExerciseType { PushUps, Squats }
 
 class MainActivity : ComponentActivity() {
@@ -102,9 +104,14 @@ fun AppNavigation(viewModel: TrackerViewModel = viewModel()) {
     when (currentScreen) {
         Screen.Main -> TrackerScreen(
             viewModel = viewModel,
-            onOpenHistory = { currentScreen = Screen.History }
+            onOpenHistory = { currentScreen = Screen.History },
+            onOpenNotes = { currentScreen = Screen.Notes }
         )
         Screen.History -> HistoryScreen(
+            viewModel = viewModel,
+            onBackClick = { currentScreen = Screen.Main }
+        )
+        Screen.Notes -> NotesScreen(
             viewModel = viewModel,
             onBackClick = { currentScreen = Screen.Main }
         )
@@ -115,7 +122,8 @@ fun AppNavigation(viewModel: TrackerViewModel = viewModel()) {
 @Composable
 fun TrackerScreen(
     viewModel: TrackerViewModel,
-    onOpenHistory: () -> Unit
+    onOpenHistory: () -> Unit,
+    onOpenNotes: () -> Unit
 ) {
     val stepsCount by viewModel.todaySteps.collectAsState()
     val distanceKm by viewModel.todayDistanceKm.collectAsState()
@@ -185,6 +193,9 @@ fun TrackerScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = onOpenNotes) {
+                        Icon(imageVector = Icons.Rounded.Note, contentDescription = "Заметки")
+                    }
                     IconButton(onClick = { showAddActivityDialog = true }) {
                         Icon(imageVector = Icons.Rounded.Add, contentDescription = "Добавить активность")
                     }
@@ -393,7 +404,7 @@ fun MetricCard(
             }
 
             LinearProgressIndicator(
-                progress = animatedProgress,
+                progress = { animatedProgress },
                 modifier = Modifier.fillMaxWidth().height(12.dp).clip(RoundedCornerShape(6.dp)),
                 color = contentColor,
                 trackColor = contentColor.copy(alpha = 0.2f)
