@@ -29,9 +29,9 @@ import androidx.compose.material.icons.rounded.FitnessCenter
 import androidx.compose.material.icons.rounded.LocalFireDepartment
 import androidx.compose.material.icons.rounded.Map
 import androidx.compose.material.icons.rounded.Note
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.*
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -48,8 +48,6 @@ import com.example.pixeltracker.ui.HistoryScreen
 import com.example.pixeltracker.ui.NotesScreen
 import com.example.pixeltracker.ui.TrackerViewModel
 import com.example.pixeltracker.worker.ReminderWorker
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import java.util.concurrent.TimeUnit
 
 enum class Screen { Main, History, Notes }
@@ -147,9 +145,6 @@ fun TrackerScreen(
     val customActivities by viewModel.customActivities.collectAsState()
     val customProgress by viewModel.todayCustomProgress.collectAsState()
 
-    var isRefreshing by remember { mutableStateOf(false) }
-    val coroutineScope = rememberCoroutineScope()
-
     var activeDialogExercise by remember { mutableStateOf<ExerciseType?>(null) }
     var showGoalDialog by remember { mutableStateOf(false) }
     var showAddActivityDialog by remember { mutableStateOf(false) }
@@ -204,6 +199,10 @@ fun TrackerScreen(
                     }
                 },
                 actions = {
+                    // Кнопка обновления данных с датчиков
+                    IconButton(onClick = { viewModel.refreshData() }) {
+                        Icon(imageVector = Icons.Rounded.Refresh, contentDescription = "Обновить")
+                    }
                     IconButton(onClick = onOpenNotes) {
                         Icon(imageVector = Icons.Rounded.Note, contentDescription = "Заметки")
                     }
@@ -223,89 +222,75 @@ fun TrackerScreen(
             )
         }
     ) { innerPadding ->
-        PullToRefreshBox(
-            isRefreshing = isRefreshing,
-            onRefresh = {
-                isRefreshing = true
-                viewModel.refreshData()
-                coroutineScope.launch {
-                    delay(600)
-                    isRefreshing = false
-                }
-            },
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
+                .padding(horizontal = 20.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 20.dp)
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                Spacer(modifier = Modifier.height(4.dp))
-                MetricCard(
-                    title = "Шаги",
-                    value = "$stepsCount",
-                    unit = "/ $stepsGoal",
-                    progress = if (stepsGoal > 0) stepsCount.toFloat() / stepsGoal else 0f,
-                    icon = Icons.Rounded.DirectionsWalk,
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                )
+            Spacer(modifier = Modifier.height(4.dp))
+            MetricCard(
+                title = "Шаги",
+                value = "$stepsCount",
+                unit = "/ $stepsGoal",
+                progress = if (stepsGoal > 0) stepsCount.toFloat() / stepsGoal else 0f,
+                icon = Icons.Rounded.DirectionsWalk,
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+
+            MetricCard(
+                title = "Километры",
+                value = "$distanceKm",
+                unit = "км / $distanceGoalKm км",
+                progress = if (distanceGoalKm > 0f) distanceKm / distanceGoalKm else 0f,
+                icon = Icons.Rounded.Map,
+                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            MetricCard(
+                title = "Отжимания",
+                value = "$pushUpsCount",
+                unit = "/ $pushUpsGoal",
+                progress = if (pushUpsGoal > 0) pushUpsCount.toFloat() / pushUpsGoal else 0f,
+                icon = Icons.Rounded.FitnessCenter,
+                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                onActionClick = { activeDialogExercise = ExerciseType.PushUps }
+            )
+
+            MetricCard(
+                title = "Приседания",
+                value = "$squatsCount",
+                unit = "/ $squatsGoal",
+                progress = if (squatsGoal > 0) squatsCount.toFloat() / squatsGoal else 0f,
+                icon = Icons.Rounded.DirectionsRun,
+                containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+                onActionClick = { activeDialogExercise = ExerciseType.Squats }
+            )
+
+            customActivities.forEach { activity ->
+                val progressItem = customProgress.find { it.activityId == activity.id }
+                val currentCount = progressItem?.currentCount ?: 0
+                val goal = progressItem?.goalCount ?: activity.defaultGoal
 
                 MetricCard(
-                    title = "Километры",
-                    value = "$distanceKm",
-                    unit = "км / $distanceGoalKm км",
-                    progress = if (distanceGoalKm > 0f) distanceKm / distanceGoalKm else 0f,
-                    icon = Icons.Rounded.Map,
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
-                MetricCard(
-                    title = "Отжимания",
-                    value = "$pushUpsCount",
-                    unit = "/ $pushUpsGoal",
-                    progress = if (pushUpsGoal > 0) pushUpsCount.toFloat() / pushUpsGoal else 0f,
+                    title = activity.name,
+                    value = "$currentCount",
+                    unit = "${activity.unit} / $goal",
+                    progress = if (goal > 0) currentCount.toFloat() / goal else 0f,
                     icon = Icons.Rounded.FitnessCenter,
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                    onActionClick = { activeDialogExercise = ExerciseType.PushUps }
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                    onActionClick = { selectedCustomActivityId = activity.id }
                 )
-
-                MetricCard(
-                    title = "Приседания",
-                    value = "$squatsCount",
-                    unit = "/ $squatsGoal",
-                    progress = if (squatsGoal > 0) squatsCount.toFloat() / squatsGoal else 0f,
-                    icon = Icons.Rounded.DirectionsRun,
-                    containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
-                    onActionClick = { activeDialogExercise = ExerciseType.Squats }
-                )
-
-                customActivities.forEach { activity ->
-                    val progressItem = customProgress.find { it.activityId == activity.id }
-                    val currentCount = progressItem?.currentCount ?: 0
-                    val goal = progressItem?.goalCount ?: activity.defaultGoal
-
-                    MetricCard(
-                        title = activity.name,
-                        value = "$currentCount",
-                        unit = "${activity.unit} / $goal",
-                        progress = if (goal > 0) currentCount.toFloat() / goal else 0f,
-                        icon = Icons.Rounded.FitnessCenter,
-                        containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                        contentColor = MaterialTheme.colorScheme.onSurface,
-                        onActionClick = { selectedCustomActivityId = activity.id }
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(20.dp))
             }
+
+            Spacer(modifier = Modifier.height(20.dp))
         }
 
         activeDialogExercise?.let { exercise ->
