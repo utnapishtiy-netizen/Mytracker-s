@@ -29,19 +29,16 @@ class StepCounterManager(context: Context) : SensorEventListener {
         sensorManager.unregisterListener(this)
     }
 
-    // Метод для принудительного обновления/пересчета
     fun refresh() {
-        // Сигнализируем о необходимости пересчета текущего состояния
         val current = _stepCount.value
         _stepCount.value = current
     }
 
     override fun onSensorChanged(event: SensorEvent?) {
-        if (event?.sensor?.type == Sensor.TYPE_SENSOR_STRING || event?.sensor?.type == Sensor.TYPE_STEP_COUNTER) {
+        if (event?.sensor?.type == Sensor.TYPE_STEP_COUNTER) {
             val totalStepsFromBoot = event.values[0].toInt()
             val currentDate = LocalDate.now().toString()
 
-            // Если наступил новый день, сбрасываем базовое значение шагов
             if (currentDate != lastRecordedDate) {
                 lastRecordedDate = currentDate
                 initialSensorSteps = totalStepsFromBoot
@@ -51,7 +48,6 @@ class StepCounterManager(context: Context) : SensorEventListener {
                 initialSensorSteps = totalStepsFromBoot
             }
 
-            // Вычисляем шаги за текущий день с момента включения телефона / сброса
             val stepsToday = maxOf(0, totalStepsFromBoot - initialSensorSteps)
             _stepCount.value = stepsToday
         }
