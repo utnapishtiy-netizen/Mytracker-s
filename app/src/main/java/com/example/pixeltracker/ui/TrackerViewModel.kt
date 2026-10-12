@@ -20,6 +20,24 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
 
     val stepCounterManager = StepCounterManager(application)
 
+    private val noteDao = AppDatabase.getDatabase(application).noteDao()
+
+    val notes: StateFlow<List<NoteEntity>> = noteDao.getAllNotes()
+        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    fun addNote(title: String, content: String) {
+        if (title.isBlank() && content.isBlank()) return
+        viewModelScope.launch {
+            noteDao.insertNote(NoteEntity(title = title.trim(), content = content.trim()))
+        }
+    }
+
+    fun deleteNote(note: NoteEntity) {
+        viewModelScope.launch {
+            noteDao.deleteNote(note)
+        }
+    }
+
     val todayTracker: StateFlow<DailyTracker?> = dao.getTrackerByDate(todayDateString)
         .stateIn(viewModelScope, SharingStarted.Lazily, null)
 
