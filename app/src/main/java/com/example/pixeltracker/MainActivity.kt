@@ -56,9 +56,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
-        // Включаем системный режим Edge-to-Edge для работы жестов на всю площадь экрана
         enableEdgeToEdge()
-
         createNotificationChannel()
 
         val dailyWorkRequest = PeriodicWorkRequestBuilder<ReminderWorker>(24, TimeUnit.HOURS).build()
@@ -77,8 +75,6 @@ class MainActivity : ComponentActivity() {
             }
 
             MaterialTheme(colorScheme = colorScheme) {
-                // Применяем системные инсеты для навигационной панели и строки состояния,
-                // чтобы контент не перекрывался системными жестами
                 Surface(
                     modifier = Modifier
                         .fillMaxSize()
@@ -577,14 +573,14 @@ fun SetGoalsDialog(
 }
 
 @Composable
-flun GoalAdjusterRow(label: String, value: Int, onValueChange: (Int) -> Unit) {
+fun GoalAdjusterRow(label: String, value: Int, onValueChange: (Int) -> Unit) {
     var textValue by remember(value) { mutableStateOf("$value") }
 
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(text = label, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             FilledIconButton(
-                onClick = { onValueChange((value - 1).coerceAtLeast(1)) },
+                onClick = { onValueChange(maxOf(1, value - 1)) },
                 shape = RoundedCornerShape(12.dp),
                 colors = IconButtonDefaults.filledIconButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
             ) { Text("-", style = MaterialTheme.typography.titleLarge) }
@@ -597,7 +593,7 @@ flun GoalAdjusterRow(label: String, value: Int, onValueChange: (Int) -> Unit) {
                     val parsed = filtered.toIntOrNull()
                     if (parsed != null && parsed >= 1) onValueChange(parsed)
                 },
-                singleLiney = true,
+                singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(12.dp)
