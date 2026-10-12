@@ -6,16 +6,18 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 
 @Database(
-    entities = [DailyTracker::class, CustomActivityEntity::class, ActivityProgressEntity::class, NoteEntity::class],
-    version = 4, // Увеличьте версию на 1
+    entities = [
+        DailyTracker::class,
+        CustomActivityEntity::class,
+        ActivityProgressEntity::class,
+        NoteEntity::class
+    ],
+    version = 4,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun trackerDao(): TrackerDao
-    abstract fun noteDao(): NoteDao // Добавили DAO для заметок
-
-    // ... остальной код синглтона базы данных с .fallbackToDestructiveMigration()
-}
+    abstract fun noteDao(): NoteDao
 
     companion object {
         @Volatile
@@ -26,7 +28,7 @@ abstract class AppDatabase : RoomDatabase() {
                 val instance = Room.databaseBuilder(
                     context.applicationContext,
                     AppDatabase::class.java,
-                    "my_tracker_database"
+                    "pixel_tracker_database"
                 )
                     .fallbackToDestructiveMigration()
                     .build()
