@@ -1,52 +1,67 @@
 package com.example.pixeltracker.worker
 
-import android.Manifest
+import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
-import androidx.core.app.ActivityCompat
+import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.work.Worker
 import androidx.work.WorkerParameters
 import com.example.pixeltracker.MainActivity
+import com.example.pixeltracker.R
 
-class ReminderWorker(context: Context, params: WorkerParameters) : Worker(context, params) {
+class ReminderWorker(
+    appContext: Context,
+    workerParams: WorkerParameters
+) : Worker(appContext, workerParams) {
+
     override fun doWork(): Result {
-        val context = applicationContext
-        val notificationManager =
-            context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val title = inputData.getString("TITLE") ?: "Напоминание"
+        val message = inputData.getString("MESSAGE") ?: "Пора проверить активность!"
 
-        // Создаем Intent для открытия MainActivity при нажатии на уведомление
+        showNotification(applicationContext, title, message)
+
+        return Result.success()
+    }
+
+    private fun showNotification(context: Context, title: String, message: String) {
+        val channelId = "tracker_channel"
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+        // Создаем канал уведомлений для Android 8.0 и выше
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                channelId,
+                "Напоминания трекера",
+                NotificationManager.IMPORTANCE_DEFAULT
+            ).apply {
+                description = "Канал для уведомлений и напоминаний PixelTracker"
+            }
+            notificationManager.createNotificationChannel(channel)
+        }
+
+        // Интент для открытия приложения при нажатии на уведомление
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         }
-        
         val pendingIntent = PendingIntent.getActivity(
             context,
             0,
             intent,
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+            PendingIntent.FLAG_IMMUTABLE
         )
 
-        val notification = NotificationCompat.Builder(context, "tracker_channel")
-            .setContentTitle("MyTracker: Время размяться!")
-            .setContentText("Не забудьте закрыть цели по активности на сегодня.")
-            .setSmallIcon(android.R.drawable.ic_menu_my_calendar)
+        val notification = NotificationCompat.Builder(context, channelId)
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentTitle(title)
+            .setContentText(message)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-            .setAutoCancel(true) // Уведомление автоматически скроется при нажатии
-            .setContentIntent(pendingIntent) // Привязываем PendingIntent к уведомлению
+            .setContentIntent(pendingIntent)
+            .setAutoCancel(true)
             .build()
 
-        if (ActivityCompat.checkSelfPermission(
-                context,
-                Manifest.permission.POST_NOTIFICATIONS
-            ) == PackageManager.PERMISSION_GRANTED
-        ) {
-            notificationManager.notify(101, notification)
-        }
-
-        return Result.success()
+        notificationManager.notify(System.currentTimeMillis().toInt(), notification)
     }
 }
