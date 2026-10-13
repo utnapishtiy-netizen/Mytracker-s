@@ -58,7 +58,6 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
     val allHistory: StateFlow<List<DailyTracker>> = dao.getAllTrackers()
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
-    // Заметки
     val notes: StateFlow<List<NoteEntity>> = noteDao.getAllNotes()
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
@@ -70,10 +69,10 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
         stepCounterManager.startListening()
         viewModelScope.launch {
             stepCounterManager.stepCount.collect { sensorSteps ->
-                if (sensorSteps > 0) {
+                if (sensorSteps >= 0) {
                     val current = getOrCreateToday()
                     val sensorKm = sensorSteps * 0.00075f
-                    if (sensorSteps > current.stepsCount) {
+                    if (sensorSteps != current.stepsCount) {
                         dao.insertOrUpdate(
                             current.copy(
                                 stepsCount = sensorSteps,
@@ -90,6 +89,13 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
     override fun onCleared() {
         super.onCleared()
         stepCounterManager.stopListening()
+    }
+
+    fun refreshData() {
+        viewModelScope.launch {
+            stepCounterManager.refresh()
+            triggerWidgetUpdate()
+        }
     }
 
     private fun getOrCreateToday(): DailyTracker {
@@ -162,13 +168,6 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    fun refreshData() {
-        viewModelScope.launch {
-            stepCounterManager.refresh()
-            triggerWidgetUpdate()
-        }
-    }
-
     fun addCustomProgress(activityId: Long, count: Int, goal: Int) {
         viewModelScope.launch {
             val currentList = todayCustomProgress.value
@@ -181,23 +180,6 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    fun updateNote(id: Long, title: String, content: String) {
-        viewModelScope.launch {
-            // Находим текущую заметку, чтобы сохранить оригинальный timestamp, либо обновляем с новым
-            val existingNotes = notes.value
-            val target = existingNotes.find { it.id == id }
-            if (target != null) {
-                noteDao.insertNote(
-                    target.copy(
-                        title = title.trim(),
-                        content = content.trim(),
-                        timestamp = System.currentTimeMillis() // обновляем время изменения (по желанию)
-                    )
-                )
-            }
-        }
-    }
-    
     fun updateCustomProgress(activityId: Long, exactCount: Int, goal: Int) {
         viewModelScope.launch {
             dao.insertOrUpdateProgress(
@@ -212,11 +194,32 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    // Методы для заметок
-    fun addNote(title: String, content: String) {
+    fun addNote(title: String, content: String, reminderTimestamp: Long?) {
         if (title.isBlank() && content.isBlank()) return
         viewModelScope.launch {
-            noteDao.insertNote(NoteEntity(title = title.trim(), content = content.trim()))
+            noteDao.insertNote(
+                NoteEntity(
+                    title = title.trim(),
+                    content = content.trim(),
+                    reminderTimestamp = reminderTimestamp
+                )
+            )
+        }
+    }
+
+    fun updateNote(id: Long, title: String, content: String, reminderTimestamp: Long?) {
+        viewModelScope.launch {
+            val existingNotes = notes.value
+            val target = existingNotes.find { it.id == id }
+            if (target != null) {
+                noteDao.insertNote(
+                    target.copy(
+                        title = title.trim(),
+                        content = content.trim(),
+                        reminderTimestamp = reminderTimestamp
+                    )
+                )
+            }
         }
     }
 
