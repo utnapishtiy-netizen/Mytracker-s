@@ -7,6 +7,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -65,12 +66,20 @@ sealed class Screen {
     object History : Screen()
 }
 
+// Тип редактируемой метки для диалога корректировки
+sealed class EditMetricType {
+    data class PushUps(val current: Int) : EditMetricType()
+    data class Squats(val current: Int) : EditMetricType()
+    data class Custom(val activityId: Long, val title: String, val current: Int, val goal: Int) : EditMetricType()
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainTrackerApp(viewModel: TrackerViewModel = viewModel()) {
     var currentScreen by remember { mutableStateOf<Screen>(Screen.Tracker) }
     var showSettingsDialog by remember { mutableStateOf(false) }
     var showAddActivityDialog by remember { mutableStateOf(false) }
+    var editingMetric by remember { mutableStateOf<EditMetricType?>(null) }
 
     val steps by viewModel.todaySteps.collectAsState()
     val distance by viewModel.todayDistanceKm.collectAsState()
@@ -115,19 +124,15 @@ fun MainTrackerApp(viewModel: TrackerViewModel = viewModel()) {
                             }
                         },
                         actions = {
-                            // Кнопка обновления датчиков
                             IconButton(onClick = { viewModel.refreshData() }) {
                                 Icon(imageVector = Icons.Rounded.Refresh, contentDescription = "Обновить")
                             }
-                            // Кнопка истории (Календарь)
                             IconButton(onClick = { currentScreen = Screen.History }) {
                                 Icon(imageVector = Icons.Rounded.CalendarMonth, contentDescription = "История")
                             }
-                            // Кнопка заметок
                             IconButton(onClick = { currentScreen = Screen.Notes }) {
                                 Icon(imageVector = Icons.Rounded.Note, contentDescription = "Заметки")
                             }
-                            // Кнопка настроек целей
                             IconButton(onClick = { showSettingsDialog = true }) {
                                 Icon(imageVector = Icons.Rounded.Settings, contentDescription = "Настройки целей")
                             }
@@ -180,7 +185,8 @@ fun MainTrackerApp(viewModel: TrackerViewModel = viewModel()) {
                         icon = Icons.Rounded.FitnessCenter,
                         containerColor = MaterialTheme.colorScheme.tertiaryContainer,
                         contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
-                        onActionClick = { viewModel.addPushUps(10) }
+                        onActionClick = { viewModel.addPushUps(10) },
+                        onEditClick = { editingMetric = EditMetricType.PushUps(pushUps) }
                     )
 
                     MetricCard(
@@ -191,10 +197,10 @@ fun MainTrackerApp(viewModel: TrackerViewModel = viewModel()) {
                         icon = Icons.Rounded.AccessibilityNew,
                         containerColor = MaterialTheme.colorScheme.surfaceVariant,
                         contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        onActionClick = { viewModel.addSquats(10) }
+                        onActionClick = { viewModel.addSquats(10) },
+                        onEditClick = { editingMetric = EditMetricType.Squats(squats) }
                     )
 
-                    // Динамический вывод пользовательских (кастомных) активностей
                     customActivities.forEach { activity ->
                         val progressItem = customProgress.find { it.activityId == activity.id }
                         val currentCount = progressItem?.currentCount ?: 0
@@ -208,18 +214,67 @@ fun MainTrackerApp(viewModel: TrackerViewModel = viewModel()) {
                             icon = Icons.Rounded.Star,
                             containerColor = MaterialTheme.colorScheme.secondaryContainer,
                             contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                            onActionClick = { viewModel.addCustomProgress(activity.id, 5, goalCount) }
+                            onActionClick = { viewModel.addCustomProgress(activity.id, 5, goalCount) },
+                            onEditClick = { editingMetric = EditMetricType.Custom(activity.id, activity.name, currentCount, goalCount) }
                         )
                     }
                     
-                    // Отступ снизу для FAB
                     Spacer(modifier = Modifier.height(64.dp))
                 }
             }
         }
     }
 
-    // Диалог создания новой кастомной активности
+    // Диалог точной корректировки значения счетчика
+    editingMetric?.let { metric ->
+        var inputVal by remember {
+            mutableStateOf(
+                when (metric) {
+                    is EditMetricType.PushUps -> metric.current.toString()
+                    is EditMetricType.Squats -> metric.current.toString()
+                    is EditMetricType.Custom -> metric.current.toString()
+                }
+            )
+        }
+        val titleText = when (metric) {
+            is EditMetricType.PushUps -> "Отжимания: точное значение"
+            is EditMetricType.Squats -> "Приседания: точное значение"
+            is EditMetricType.Custom -> "Корректировка: ${metric.title}"
+        }
+
+        AlertDialog(
+            onDismissRequest = { editingMetric = null },
+            title = { Text(titleText) },
+            text = {
+                OutlinedTextField(
+                    value = inputVal,
+                    onValueChange = { inputVal = it },
+                    label = { Text("Значение") },
+                    singleLine = true,
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val newVal = inputVal.toIntOrNull() ?: 0
+                    when (metric) {
+                        is EditMetricType.PushUps -> viewModel.setPushUps(newVal)
+                        is EditMetricType.Squats -> viewModel.setSquats(newVal)
+                        is EditMetricType.Custom -> viewModel.updateCustomProgress(metric.activityId, newVal, metric.goal)
+                    }
+                    editingMetric = null
+                }) {
+                    Text("Установить")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { editingMetric = null }) { Text("Отмена") }
+            },
+            shape = RoundedCornerShape(28.dp)
+        )
+    }
+
     if (showAddActivityDialog) {
         AddCustomActivityDialog(
             onDismiss = { showAddActivityDialog = false },
@@ -230,7 +285,6 @@ fun MainTrackerApp(viewModel: TrackerViewModel = viewModel()) {
         )
     }
 
-    // Диалог настройки целей
     if (showSettingsDialog) {
         GoalsSettingsDialog(
             currentPushUpsGoal = pushUpsGoal,
@@ -246,7 +300,6 @@ fun MainTrackerApp(viewModel: TrackerViewModel = viewModel()) {
     }
 }
 
-// Диалог добавления кастомной активности
 @Composable
 fun AddCustomActivityDialog(
     onDismiss: () -> Unit,
@@ -304,7 +357,6 @@ fun AddCustomActivityDialog(
     )
 }
 
-// Экран истории и результатов
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HistoryScreen(
@@ -370,7 +422,6 @@ fun HistoryScreen(
     }
 }
 
-// Диалог настройки целей
 @Composable
 fun GoalsSettingsDialog(
     currentPushUpsGoal: Int,
@@ -450,13 +501,16 @@ fun MetricCard(
     icon: ImageVector,
     containerColor: Color,
     contentColor: Color,
-    onActionClick: (() -> Unit)? = null
+    onActionClick: (() -> Unit)? = null,
+    onEditClick: (() -> Unit)? = null
 ) {
     Card(
         shape = RoundedCornerShape(28.dp),
         colors = CardDefaults.cardColors(containerColor = containerColor),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .let { if (onEditClick != null) it.clickable(onClick = onEditClick) else it }
     ) {
         Column(
             modifier = Modifier.padding(24.dp),
@@ -485,19 +539,37 @@ fun MetricCard(
                     )
                 }
 
-                if (onActionClick != null) {
-                    FilledIconButton(
-                        onClick = onActionClick,
-                        shape = RoundedCornerShape(16.dp),
-                        colors = IconButtonDefaults.filledIconButtonColors(
-                            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.6f)
-                        )
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Add,
-                            contentDescription = "Добавить",
-                            tint = MaterialTheme.colorScheme.onSurface
-                        )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (onEditClick != null) {
+                        FilledIconButton(
+                            onClick = onEditClick,
+                            shape = RoundedCornerShape(16.dp),
+                            colors = IconButtonDefaults.filledIconButtonColors(
+                                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.6f)
+                            )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Edit,
+                                contentDescription = "Править",
+                                tint = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+
+                    if (onActionClick != null) {
+                        FilledIconButton(
+                            onClick = onActionClick,
+                            shape = RoundedCornerShape(16.dp),
+                            colors = IconButtonDefaults.filledIconButtonColors(
+                                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.6f)
+                            )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Add,
+                                contentDescription = "Добавить",
+                                tint = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
                     }
                 }
             }
