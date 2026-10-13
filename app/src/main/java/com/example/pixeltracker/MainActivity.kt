@@ -8,10 +8,13 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -59,12 +62,14 @@ class MainActivity : ComponentActivity() {
 sealed class Screen {
     object Tracker : Screen()
     object Notes : Screen()
+    object History : Screen()
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainTrackerApp(viewModel: TrackerViewModel = viewModel()) {
     var currentScreen by remember { mutableStateOf<Screen>(Screen.Tracker) }
+    var showSettingsDialog by remember { mutableStateOf(false) }
 
     val steps by viewModel.todaySteps.collectAsState()
     val distance by viewModel.todayDistanceKm.collectAsState()
@@ -77,10 +82,18 @@ fun MainTrackerApp(viewModel: TrackerViewModel = viewModel()) {
     val squatsGoal by viewModel.squatsGoal.collectAsState()
     val distanceGoal by viewModel.distanceGoalKm.collectAsState()
 
+    val historyList by viewModel.allHistory.collectAsState()
+
     when (currentScreen) {
         is Screen.Notes -> {
             NotesScreen(
                 viewModel = viewModel,
+                onBackClick = { currentScreen = Screen.Tracker }
+            )
+        }
+        is Screen.History -> {
+            HistoryScreen(
+                historyList = historyList,
                 onBackClick = { currentScreen = Screen.Tracker }
             )
         }
@@ -99,11 +112,21 @@ fun MainTrackerApp(viewModel: TrackerViewModel = viewModel()) {
                             }
                         },
                         actions = {
+                            // Кнопка обновления датчиков/данных
                             IconButton(onClick = { viewModel.refreshData() }) {
                                 Icon(imageVector = Icons.Rounded.Refresh, contentDescription = "Обновить")
                             }
+                            // Кнопка истории (Календарь и результаты)
+                            IconButton(onClick = { currentScreen = Screen.History }) {
+                                Icon(imageVector = Icons.Rounded.CalendarMonth, contentDescription = "История")
+                            }
+                            // Кнопка заметок
                             IconButton(onClick = { currentScreen = Screen.Notes }) {
                                 Icon(imageVector = Icons.Rounded.Note, contentDescription = "Заметки")
+                            }
+                            // Кнопка настроек целей
+                            IconButton(onClick = { showSettingsDialog = true }) {
+                                Icon(imageVector = Icons.Rounded.Settings, contentDescription = "Настройки целей")
                             }
                         }
                     )
@@ -162,6 +185,158 @@ fun MainTrackerApp(viewModel: TrackerViewModel = viewModel()) {
             }
         }
     }
+
+    // Диалог настройки целей
+    if (showSettingsDialog) {
+        GoalsSettingsDialog(
+            currentPushUpsGoal = pushUpsGoal,
+            currentSquatsGoal = squatsGoal,
+            currentStepsGoal = stepsGoal,
+            currentDistanceGoal = distanceGoal,
+            onDismiss = { showSettingsDialog = false },
+            onSave = { pU, sQ, sG, dG ->
+                viewModel.updateGoals(pU, sQ, sG, dG)
+                showSettingsDialog = false
+            }
+        )
+    }
+}
+
+// Экран истории и результатов по дням (Календарь)
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun HistoryScreen(
+    historyList: List<com.example.pixeltracker.data.DailyTracker>,
+    onBackClick: () -> Unit
+) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("История и результаты", fontWeight = FontWeight.Bold) },
+                navigationIcon = {
+                    IconButton(onClick = onBackClick) {
+                        Icon(imageVector = Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Назад")
+                    }
+                }
+            )
+        }
+    ) { innerPadding ->
+        if (historyList.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("История пока пуста. Начните выполнять цели!", style = MaterialTheme.typography.bodyLarge)
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .padding(horizontal = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(vertical = 12.dp)
+            ) {
+                items(historyList) { day ->
+                    Card(
+                        shape = RoundedCornerShape(20.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(
+                                text = "📅 ${day.date}",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Divider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+                            Text("👣 Шаги: ${day.stepsCount} / ${day.stepsGoal}")
+                            Text("📍 Дистанция: ${day.distanceKm} км / ${day.distanceGoalKm} км")
+                            Text("💪 Отжимания: ${day.pushUpsCount} / ${day.pushUpsGoal}")
+                            Text("🦵 Приседания: ${day.squatsCount} / ${day.squatsGoal}")
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Диалог настройки целей
+@Composable
+fun GoalsSettingsDialog(
+    currentPushUpsGoal: Int,
+    currentSquatsGoal: Int,
+    currentStepsGoal: Int,
+    currentDistanceGoal: Float,
+    onDismiss: () -> Unit,
+    onSave: (Int, Int, Int, Float) -> Unit
+) {
+    var pushUps by remember { mutableStateOf(currentPushUpsGoal.toString()) }
+    var squats by remember { mutableStateOf(currentSquatsGoal.toString()) }
+    var steps by remember { mutableStateOf(currentStepsGoal.toString()) }
+    var distance by remember { mutableStateOf(currentDistanceGoal.toString()) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Настройка целей") },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.verticalScroll(rememberScrollState())
+            ) {
+                OutlinedTextField(
+                    value = steps,
+                    onValueChange = { steps = it },
+                    label = { Text("Цель по шагам") },
+                    singleLine = true,
+                    shape = RoundedCornerShape(16.dp)
+                )
+                OutlinedTextField(
+                    value = distance,
+                    onValueChange = { distance = it },
+                    label = { Text("Цель по дистанции (км)") },
+                    singleLine = true,
+                    shape = RoundedCornerShape(16.dp)
+                )
+                OutlinedTextField(
+                    value = pushUps,
+                    onValueChange = { pushUps = it },
+                    label = { Text("Цель по отжиманиям") },
+                    singleLine = true,
+                    shape = RoundedCornerShape(16.dp)
+                )
+                OutlinedTextField(
+                    value = squats,
+                    onValueChange = { squats = it },
+                    label = { Text("Цель по приседаниям") },
+                    singleLine = true,
+                    shape = RoundedCornerShape(16.dp)
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                val pU = pushUps.toIntOrNull() ?: currentPushUpsGoal
+                val sQ = squats.toIntOrNull() ?: currentSquatsGoal
+                val sG = steps.toIntOrNull() ?: currentStepsGoal
+                val dG = distance.toFloatOrNull() ?: currentDistanceGoal
+                onSave(pU, sQ, sG, dG)
+            }) {
+                Text("Сохранить")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Отмена") }
+        },
+        shape = RoundedCornerShape(28.dp)
+    )
 }
 
 @Composable
