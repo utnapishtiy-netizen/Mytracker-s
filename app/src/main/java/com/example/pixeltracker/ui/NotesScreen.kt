@@ -1,5 +1,6 @@
 package com.example.pixeltracker.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -27,6 +28,7 @@ fun NotesScreen(
 ) {
     val notes by viewModel.notes.collectAsState()
     var showAddDialog by remember { mutableStateOf(false) }
+    var editingNote by remember { mutableStateOf<NoteEntity?>(null) }
 
     Scaffold(
         topBar = {
@@ -72,13 +74,21 @@ fun NotesScreen(
                 contentPadding = PaddingValues(vertical = 12.dp)
             ) {
                 items(notes) { note ->
-                    NoteCard(note = note, onDelete = { viewModel.deleteNote(note) })
+                    NoteCard(
+                        note = note,
+                        onDelete = { viewModel.deleteNote(note) },
+                        onClick = { editingNote = note } // Открываем редактор при клике на карточку
+                    )
                 }
             }
         }
 
+        // Диалог создания новой заметки
         if (showAddDialog) {
-            AddNoteDialog(
+            NoteEditDialog(
+                initialTitle = "",
+                initialContent = "",
+                isEditing = false,
                 onDismiss = { showAddDialog = false },
                 onConfirm = { title, content ->
                     viewModel.addNote(title, content)
@@ -86,18 +96,34 @@ fun NotesScreen(
                 }
             )
         }
+
+        // Диалог редактирования существующей заметки
+        editingNote?.let { note ->
+            NoteEditDialog(
+                initialTitle = note.title,
+                initialContent = note.content,
+                isEditing = true,
+                onDismiss = { editingNote = null },
+                onConfirm = { title, content ->
+                    viewModel.updateNote(note.id, title, content)
+                    editingNote = null
+                }
+            )
+        }
     }
 }
 
 @Composable
-fun NoteCard(note: NoteEntity, onDelete: () -> Unit) {
+fun NoteCard(note: NoteEntity, onDelete: () -> Unit, onClick: () -> Unit) {
     val dateFormat = remember { SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault()) }
     val dateString = dateFormat.format(Date(note.timestamp))
 
     Card(
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick) // Делаем карточку интерактивной для редактирования
     ) {
         Column(
             modifier = Modifier
@@ -136,6 +162,7 @@ fun NoteCard(note: NoteEntity, onDelete: () -> Unit) {
                 )
             }
 
+            // Индикатор даты и времени
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -159,16 +186,19 @@ fun NoteCard(note: NoteEntity, onDelete: () -> Unit) {
 }
 
 @Composable
-fun AddNoteDialog(
+fun NoteEditDialog(
+    initialTitle: String,
+    initialContent: String,
+    isEditing: Boolean,
     onDismiss: () -> Unit,
     onConfirm: (String, String) -> Unit
 ) {
-    var title by remember { mutableStateOf("") }
-    var content by remember { mutableStateOf("") }
+    var title by remember { mutableStateOf(initialTitle) }
+    var content by remember { mutableStateOf(initialContent) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Новая заметка") },
+        title = { Text(if (isEditing) "Редактировать заметку" else "Новая заметка") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(
