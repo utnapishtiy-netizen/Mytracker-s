@@ -12,7 +12,6 @@ import java.time.LocalDate
 class StepCounterManager(context: Context) : SensorEventListener {
     private val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
     private val stepSensor: Sensor? = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_COUNTER)
-
     private val sharedPrefs = context.getSharedPreferences("step_counter_prefs", Context.MODE_PRIVATE)
 
     private val _stepCount = MutableStateFlow(0)
@@ -41,7 +40,6 @@ class StepCounterManager(context: Context) : SensorEventListener {
             val savedDate = sharedPrefs.getString("saved_date", "")
             var initialSteps = sharedPrefs.getInt("initial_steps", -1)
 
-            // Если наступил новый день или приложение запускается впервые после сброса
             if (currentDate != savedDate || initialSteps == -1) {
                 initialSteps = totalStepsFromBoot
                 sharedPrefs.edit()
@@ -50,7 +48,6 @@ class StepCounterManager(context: Context) : SensorEventListener {
                     .apply()
             }
 
-            // Защита на случай перезагрузки телефона (когда totalStepsFromBoot стал меньше initialSteps)
             if (totalStepsFromBoot < initialSteps) {
                 initialSteps = totalStepsFromBoot
                 sharedPrefs.edit()
