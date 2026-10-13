@@ -6,6 +6,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -16,6 +17,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -23,7 +25,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.pixeltracker.ui.NotesScreen
 import com.example.pixeltracker.ui.TrackerViewModel
-import com.example.pixeltracker.ui.theme.ThemePixeltracker // Или ваша тема, если название отличается
 
 class MainActivity : ComponentActivity() {
 
@@ -34,7 +35,6 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Запрос необходимых разрешений для шагов и уведомлений
         val permissions = mutableListOf(
             Manifest.permission.ACTIVITY_RECOGNITION
         )
@@ -44,7 +44,6 @@ class MainActivity : ComponentActivity() {
         requestPermissionLauncher.launch(permissions.toTypedArray())
 
         setContent {
-            // Если у вас сгенерировалась другая тема, замените ThemePixeltracker на нее
             MaterialTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
