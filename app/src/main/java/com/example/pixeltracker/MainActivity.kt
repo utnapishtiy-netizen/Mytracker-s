@@ -10,8 +10,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -25,10 +29,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.pixeltracker.ui.NotesScreen
 import com.example.pixeltracker.ui.TrackerViewModel
+import java.time.LocalDate
+import java.time.YearMonth
 
 class MainActivity : ComponentActivity() {
 
@@ -66,7 +74,6 @@ sealed class Screen {
     object History : Screen()
 }
 
-// Тип редактируемой метки для точной корректировки
 sealed class EditMetricType {
     data class PushUps(val current: Int) : EditMetricType()
     data class Squats(val current: Int) : EditMetricType()
@@ -124,19 +131,15 @@ fun MainTrackerApp(viewModel: TrackerViewModel = viewModel()) {
                             }
                         },
                         actions = {
-                            // Обновление данных датчика
                             IconButton(onClick = { viewModel.refreshData() }) {
                                 Icon(imageVector = Icons.Rounded.Refresh, contentDescription = "Обновить")
                             }
-                            // КНОПКА КАЛЕНДАРЯ (История результатов)
                             IconButton(onClick = { currentScreen = Screen.History }) {
                                 Icon(imageVector = Icons.Rounded.CalendarMonth, contentDescription = "Календарь истории")
                             }
-                            // Заметки
                             IconButton(onClick = { currentScreen = Screen.Notes }) {
                                 Icon(imageVector = Icons.Rounded.Note, contentDescription = "Заметки")
                             }
-                            // Настройки целей
                             IconButton(onClick = { showSettingsDialog = true }) {
                                 Icon(imageVector = Icons.Rounded.Settings, contentDescription = "Настройки целей")
                             }
@@ -229,7 +232,6 @@ fun MainTrackerApp(viewModel: TrackerViewModel = viewModel()) {
         }
     }
 
-    // Диалог точной корректировки
     editingMetric?.let { metric ->
         var inputVal by remember {
             mutableStateOf(
@@ -311,10 +313,19 @@ fun HistoryScreen(
     historyList: List<com.example.pixeltracker.data.DailyTracker>,
     onBackClick: () -> Unit
 ) {
+    val currentYearMonth = remember { YearMonth.now() }
+    val daysInMonth = remember { currentYearMonth.lengthOfMonth() }
+    val firstDayOfWeek = remember { currentYearMonth.atDay(1).dayOfWeek.value } // 1 = Пн, 7 = Вс
+
+    // Мапа для быстрого поиска данных по строке даты (YYYY-MM-DD)
+    val historyMap = remember(historyList) {
+        historyList.associateBy { it.date }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("История и календарь", fontWeight = FontWeight.Bold) },
+                title = { Text("Календарь и история", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
                         Icon(imageVector = Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Назад")
@@ -323,24 +334,132 @@ fun HistoryScreen(
             )
         }
     ) { innerPadding ->
-        if (historyList.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("История пока пуста. Начните выполнять цели!", style = MaterialTheme.typography.bodyLarge)
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .padding(horizontal = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            contentPadding = PaddingValues(vertical = 12.dp)
+        ) {
+            // Секция: Визуальный календарь текущего месяца
+            item {
+                Card(
+                    shape = RoundedCornerShape(24.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text(
+                            text = "📅 ${currentYearMonth.month.name} ${currentYearMonth.year}",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+
+                        // Дни недели
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceAround
+                        ) {
+                            listOf("Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс").forEach { dayName ->
+                                Text(
+                                    text = dayName,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.width(36.dp)
+                                )
+                            }
+                        }
+
+                        // Сетка дней месяца
+                        LazyVerticalGrid(
+                            columns = GridCells.Fixed(7),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(240.dp),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                            userScrollEnabled = false
+                        ) {
+                            // Пустые ячейки для сдвига недели
+                            items(firstDayOfWeek - 1) {
+                                Box(modifier = Modifier.size(36.dp))
+                            }
+
+                            // Дни месяца
+                            items(daysInMonth) { dayIndex ->
+                                val dayNum = dayIndex + 1
+                                val dateStr = String.format("%d-%02d-%02d", currentYearMonth.year, currentYearMonth.monthValue, dayNum)
+                                val tracker = historyMap[dateStr]
+
+                                // Проверяем, выполнена ли хотя бы одна цель в этот день
+                                val isCompleted = tracker != null && (
+                                        tracker.stepsCount >= tracker.stepsGoal ||
+                                                tracker.pushUpsCount >= tracker.pushUpsGoal ||
+                                                tracker.squatsCount >= tracker.squatsGoal ||
+                                                tracker.distanceKm >= tracker.distanceGoalKm
+                                        )
+
+                                val cellColor = when {
+                                    isCompleted -> MaterialTheme.colorScheme.primaryContainer
+                                    tracker != null -> MaterialTheme.colorScheme.secondaryContainer
+                                    else -> MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
+                                }
+
+                                val textColor = when {
+                                    isCompleted -> MaterialTheme.colorScheme.onPrimaryContainer
+                                    tracker != null -> MaterialTheme.colorScheme.onSecondaryContainer
+                                    else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                }
+
+                                Box(
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .clip(CircleShape)
+                                        .background(cellColor),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "$dayNum",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = if (isCompleted) FontWeight.Bold else FontWeight.Normal,
+                                        color = textColor
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
             }
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding)
-                    .padding(horizontal = 20.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                contentPadding = PaddingValues(vertical = 12.dp)
-            ) {
+
+            // Секция: Список детальной истории по дням
+            item {
+                Text(
+                    text = "История результатов",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(top = 8.dp)
+                )
+            }
+
+            if (historyList.isEmpty()) {
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 32.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("История пока пуста. Начните выполнять цели!", style = MaterialTheme.typography.bodyLarge)
+                    }
+                }
+            } else {
                 items(historyList) { day ->
                     Card(
                         shape = RoundedCornerShape(20.dp),
