@@ -70,6 +70,7 @@ sealed class Screen {
 fun MainTrackerApp(viewModel: TrackerViewModel = viewModel()) {
     var currentScreen by remember { mutableStateOf<Screen>(Screen.Tracker) }
     var showSettingsDialog by remember { mutableStateOf(false) }
+    var showAddActivityDialog by remember { mutableStateOf(false) }
 
     val steps by viewModel.todaySteps.collectAsState()
     val distance by viewModel.todayDistanceKm.collectAsState()
@@ -83,6 +84,8 @@ fun MainTrackerApp(viewModel: TrackerViewModel = viewModel()) {
     val distanceGoal by viewModel.distanceGoalKm.collectAsState()
 
     val historyList by viewModel.allHistory.collectAsState()
+    val customActivities by viewModel.customActivities.collectAsState()
+    val customProgress by viewModel.todayCustomProgress.collectAsState()
 
     when (currentScreen) {
         is Screen.Notes -> {
@@ -112,11 +115,11 @@ fun MainTrackerApp(viewModel: TrackerViewModel = viewModel()) {
                             }
                         },
                         actions = {
-                            // Кнопка обновления датчиков/данных
+                            // Кнопка обновления датчиков
                             IconButton(onClick = { viewModel.refreshData() }) {
                                 Icon(imageVector = Icons.Rounded.Refresh, contentDescription = "Обновить")
                             }
-                            // Кнопка истории (Календарь и результаты)
+                            // Кнопка истории (Календарь)
                             IconButton(onClick = { currentScreen = Screen.History }) {
                                 Icon(imageVector = Icons.Rounded.CalendarMonth, contentDescription = "История")
                             }
@@ -130,6 +133,15 @@ fun MainTrackerApp(viewModel: TrackerViewModel = viewModel()) {
                             }
                         }
                     )
+                },
+                floatingActionButton = {
+                    FloatingActionButton(
+                        onClick = { showAddActivityDialog = true },
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    ) {
+                        Icon(imageVector = Icons.Rounded.Add, contentDescription = "Добавить активность")
+                    }
                 }
             ) { innerPadding ->
                 Column(
@@ -181,9 +193,41 @@ fun MainTrackerApp(viewModel: TrackerViewModel = viewModel()) {
                         contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                         onActionClick = { viewModel.addSquats(10) }
                     )
+
+                    // Динамический вывод пользовательских (кастомных) активностей
+                    customActivities.forEach { activity ->
+                        val progressItem = customProgress.find { it.activityId == activity.id }
+                        val currentCount = progressItem?.currentCount ?: 0
+                        val goalCount = progressItem?.goalCount ?: activity.defaultGoal
+
+                        MetricCard(
+                            title = activity.name,
+                            value = "$currentCount",
+                            unit = "${activity.unit} / $goalCount",
+                            progress = if (goalCount > 0) currentCount.toFloat() / goalCount else 0f,
+                            icon = Icons.Rounded.Star,
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                            onActionClick = { viewModel.addCustomProgress(activity.id, 5, goalCount) }
+                        )
+                    }
+                    
+                    // Отступ снизу для FAB
+                    Spacer(modifier = Modifier.height(64.dp))
                 }
             }
         }
+    }
+
+    // Диалог создания новой кастомной активности
+    if (showAddActivityDialog) {
+        AddCustomActivityDialog(
+            onDismiss = { showAddActivityDialog = false },
+            onConfirm = { name, unit, goal ->
+                viewModel.addCustomActivity(name, unit, goal)
+                showAddActivityDialog = false
+            }
+        )
     }
 
     // Диалог настройки целей
@@ -202,7 +246,65 @@ fun MainTrackerApp(viewModel: TrackerViewModel = viewModel()) {
     }
 }
 
-// Экран истории и результатов по дням (Календарь)
+// Диалог добавления кастомной активности
+@Composable
+fun AddCustomActivityDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (String, String, Int) -> Unit
+) {
+    var name by remember { mutableStateOf("") }
+    var unit by remember { mutableStateOf("") }
+    var goal by remember { mutableStateOf("50") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Новая активность") },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.verticalScroll(rememberScrollState())
+            ) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Название (например: Подтягивания)") },
+                    singleLine = true,
+                    shape = RoundedCornerShape(16.dp)
+                )
+                OutlinedTextField(
+                    value = unit,
+                    onValueChange = { unit = it },
+                    label = { Text("Единица (например: раз, мин)") },
+                    singleLine = true,
+                    shape = RoundedCornerShape(16.dp)
+                )
+                OutlinedTextField(
+                    value = goal,
+                    onValueChange = { goal = it },
+                    label = { Text("Цель") },
+                    singleLine = true,
+                    shape = RoundedCornerShape(16.dp)
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                if (name.isNotBlank()) {
+                    val g = goal.toIntOrNull() ?: 50
+                    onConfirm(name.trim(), unit.trim().ifBlank { "раз" }, g)
+                }
+            }) {
+                Text("Создать")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Отмена") }
+        },
+        shape = RoundedCornerShape(28.dp)
+    )
+}
+
+// Экран истории и результатов
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HistoryScreen(
