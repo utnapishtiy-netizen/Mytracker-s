@@ -17,16 +17,10 @@ import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import com.example.pixeltracker.MainActivity
-import com.example.pixeltracker.data.AppDatabase
 import java.time.LocalDate
 
 class PushUpWidget : GlanceAppWidget() {
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val dao = AppDatabase.getDatabase(context).trackerDao()
-        val todayStr = LocalDate.now().toString()
-        // Получаем данные за сегодняшний день синхронно для виджета
-        // (или берем нули, если записей еще нет)
-        
         provideContent {
             GlanceTheme {
                 WidgetContent()
