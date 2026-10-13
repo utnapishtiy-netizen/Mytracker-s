@@ -29,4 +29,7 @@ interface TrackerDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertOrUpdateProgress(progress: ActivityProgressEntity)
+
+    @Query("SELECT * FROM daily_tracker WHERE date = :date LIMIT 1")
+    suspend fun getTrackerByDateSync(date: String): DailyTracker?
 }
