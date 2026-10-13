@@ -66,7 +66,7 @@ sealed class Screen {
     object History : Screen()
 }
 
-// Тип редактируемой метки для диалога корректировки
+// Тип редактируемой метки для точной корректировки
 sealed class EditMetricType {
     data class PushUps(val current: Int) : EditMetricType()
     data class Squats(val current: Int) : EditMetricType()
@@ -124,15 +124,19 @@ fun MainTrackerApp(viewModel: TrackerViewModel = viewModel()) {
                             }
                         },
                         actions = {
+                            // Обновление данных датчика
                             IconButton(onClick = { viewModel.refreshData() }) {
                                 Icon(imageVector = Icons.Rounded.Refresh, contentDescription = "Обновить")
                             }
+                            // КНОПКА КАЛЕНДАРЯ (История результатов)
                             IconButton(onClick = { currentScreen = Screen.History }) {
-                                Icon(imageVector = Icons.Rounded.CalendarMonth, contentDescription = "История")
+                                Icon(imageVector = Icons.Rounded.CalendarMonth, contentDescription = "Календарь истории")
                             }
+                            // Заметки
                             IconButton(onClick = { currentScreen = Screen.Notes }) {
                                 Icon(imageVector = Icons.Rounded.Note, contentDescription = "Заметки")
                             }
+                            // Настройки целей
                             IconButton(onClick = { showSettingsDialog = true }) {
                                 Icon(imageVector = Icons.Rounded.Settings, contentDescription = "Настройки целей")
                             }
@@ -225,7 +229,7 @@ fun MainTrackerApp(viewModel: TrackerViewModel = viewModel()) {
         }
     }
 
-    // Диалог точной корректировки значения счетчика
+    // Диалог точной корректировки
     editingMetric?.let { metric ->
         var inputVal by remember {
             mutableStateOf(
@@ -300,6 +304,72 @@ fun MainTrackerApp(viewModel: TrackerViewModel = viewModel()) {
     }
 }
 
+// ЭКРАН ИСТОРИИ И КАЛЕНДАРЯ
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun HistoryScreen(
+    historyList: List<com.example.pixeltracker.data.DailyTracker>,
+    onBackClick: () -> Unit
+) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("История и календарь", fontWeight = FontWeight.Bold) },
+                navigationIcon = {
+                    IconButton(onClick = onBackClick) {
+                        Icon(imageVector = Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Назад")
+                    }
+                }
+            )
+        }
+    ) { innerPadding ->
+        if (historyList.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("История пока пуста. Начните выполнять цели!", style = MaterialTheme.typography.bodyLarge)
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .padding(horizontal = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(vertical = 12.dp)
+            ) {
+                items(historyList) { day ->
+                    Card(
+                        shape = RoundedCornerShape(20.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(
+                                text = "📅 ${day.date}",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Divider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+                            Text("👣 Шаги: ${day.stepsCount} / ${day.stepsGoal}")
+                            Text("📍 Дистанция: ${day.distanceKm} км / ${day.distanceGoalKm} км")
+                            Text("💪 Отжимания: ${day.pushUpsCount} / ${day.pushUpsGoal}")
+                            Text("🦵 Приседания: ${day.squatsCount} / ${day.squatsGoal}")
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 @Composable
 fun AddCustomActivityDialog(
     onDismiss: () -> Unit,
@@ -355,71 +425,6 @@ fun AddCustomActivityDialog(
         },
         shape = RoundedCornerShape(28.dp)
     )
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun HistoryScreen(
-    historyList: List<com.example.pixeltracker.data.DailyTracker>,
-    onBackClick: () -> Unit
-) {
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("История и результаты", fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Icon(imageVector = Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Назад")
-                    }
-                }
-            )
-        }
-    ) { innerPadding ->
-        if (historyList.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("История пока пуста. Начните выполнять цели!", style = MaterialTheme.typography.bodyLarge)
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding)
-                    .padding(horizontal = 20.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                contentPadding = PaddingValues(vertical = 12.dp)
-            ) {
-                items(historyList) { day ->
-                    Card(
-                        shape = RoundedCornerShape(20.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Text(
-                                text = "📅 ${day.date}",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                            Divider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
-                            Text("👣 Шаги: ${day.stepsCount} / ${day.stepsGoal}")
-                            Text("📍 Дистанция: ${day.distanceKm} км / ${day.distanceGoalKm} км")
-                            Text("💪 Отжимания: ${day.pushUpsCount} / ${day.pushUpsGoal}")
-                            Text("🦵 Приседания: ${day.squatsCount} / ${day.squatsGoal}")
-                        }
-                    }
-                }
-            }
-        }
-    }
 }
 
 @Composable
