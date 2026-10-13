@@ -31,11 +31,10 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.pixeltracker.ui.NotesScreen
 import com.example.pixeltracker.ui.TrackerViewModel
-import java.time.LocalDate
+import com.example.pixeltracker.ui.theme.PixelTrackerTheme
 import java.time.YearMonth
 
 class MainActivity : ComponentActivity() {
@@ -56,7 +55,8 @@ class MainActivity : ComponentActivity() {
         requestPermissionLauncher.launch(permissions.toTypedArray())
 
         setContent {
-            MaterialTheme {
+            // Применяем системную тему с поддержкой Material You (динамические цвета)
+            PixelTrackerTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
@@ -315,9 +315,8 @@ fun HistoryScreen(
 ) {
     val currentYearMonth = remember { YearMonth.now() }
     val daysInMonth = remember { currentYearMonth.lengthOfMonth() }
-    val firstDayOfWeek = remember { currentYearMonth.atDay(1).dayOfWeek.value } // 1 = Пн, 7 = Вс
+    val firstDayOfWeek = remember { currentYearMonth.atDay(1).dayOfWeek.value }
 
-    // Мапа для быстрого поиска данных по строке даты (YYYY-MM-DD)
     val historyMap = remember(historyList) {
         historyList.associateBy { it.date }
     }
@@ -342,7 +341,6 @@ fun HistoryScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
             contentPadding = PaddingValues(vertical = 12.dp)
         ) {
-            // Секция: Визуальный календарь текущего месяца
             item {
                 Card(
                     shape = RoundedCornerShape(24.dp),
@@ -360,7 +358,6 @@ fun HistoryScreen(
                             color = MaterialTheme.colorScheme.primary
                         )
 
-                        // Дни недели
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceAround
@@ -377,7 +374,6 @@ fun HistoryScreen(
                             }
                         }
 
-                        // Сетка дней месяца
                         LazyVerticalGrid(
                             columns = GridCells.Fixed(7),
                             modifier = Modifier
@@ -387,18 +383,15 @@ fun HistoryScreen(
                             verticalArrangement = Arrangement.spacedBy(4.dp),
                             userScrollEnabled = false
                         ) {
-                            // Пустые ячейки для сдвига недели
                             items(firstDayOfWeek - 1) {
                                 Box(modifier = Modifier.size(36.dp))
                             }
 
-                            // Дни месяца
                             items(daysInMonth) { dayIndex ->
                                 val dayNum = dayIndex + 1
                                 val dateStr = String.format("%d-%02d-%02d", currentYearMonth.year, currentYearMonth.monthValue, dayNum)
                                 val tracker = historyMap[dateStr]
 
-                                // Проверяем, выполнена ли хотя бы одна цель в этот день
                                 val isCompleted = tracker != null && (
                                         tracker.stepsCount >= tracker.stepsGoal ||
                                                 tracker.pushUpsCount >= tracker.pushUpsGoal ||
@@ -438,7 +431,6 @@ fun HistoryScreen(
                 }
             }
 
-            // Секция: Список детальной истории по дням
             item {
                 Text(
                     text = "История результатов",
