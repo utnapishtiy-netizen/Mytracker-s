@@ -9,5 +9,6 @@ data class NoteEntity(
     val title: String,
     val content: String,
     val timestamp: Long = System.currentTimeMillis(),
-    val reminderTimestamp: Long? = null // Время напоминания
+    val reminderTimestamp: Long? = null,
+    val colorHex: String? = null // Цвет заметки в HEX формате (null — стандартный цвет)
 )
