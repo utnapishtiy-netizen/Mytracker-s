@@ -1,6 +1,10 @@
 package com.example.pixeltracker.ui
 
+import android.app.AlarmManager
 import android.app.Application
+import android.app.PendingIntent
+import android.content.Context
+import android.content.Intent
 import androidx.glance.appwidget.updateAll
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -11,6 +15,7 @@ import com.example.pixeltracker.data.DailyTracker
 import com.example.pixeltracker.data.NoteEntity
 import com.example.pixeltracker.sensor.StepCounterManager
 import com.example.pixeltracker.widget.PushUpWidget
+import com.example.pixeltracker.worker.NoteAlarmReceiver
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -194,20 +199,24 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    fun addNote(title: String, content: String, reminderTimestamp: Long?) {
+    fun addNote(title: String, content: String, reminderTimestamp: Long?, colorHex: String?) {
         if (title.isBlank() && content.isBlank()) return
         viewModelScope.launch {
-            noteDao.insertNote(
-                NoteEntity(
-                    title = title.trim(),
-                    content = content.trim(),
-                    reminderTimestamp = reminderTimestamp
-                )
+            val note = NoteEntity(
+                title = title.trim(),
+                content = content.trim(),
+                reminderTimestamp = reminderTimestamp,
+                colorHex = colorHex
             )
+            noteDao.insertNote(note)
+
+            if (reminderTimestamp != null && reminderTimestamp > System.currentTimeMillis()) {
+                scheduleNoteAlarm(System.currentTimeMillis(), title, content, reminderTimestamp)
+            }
         }
     }
 
-    fun updateNote(id: Long, title: String, content: String, reminderTimestamp: Long?) {
+    fun updateNote(id: Long, title: String, content: String, reminderTimestamp: Long?, colorHex: String?) {
         viewModelScope.launch {
             val existingNotes = notes.value
             val target = existingNotes.find { it.id == id }
@@ -216,9 +225,13 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
                     target.copy(
                         title = title.trim(),
                         content = content.trim(),
-                        reminderTimestamp = reminderTimestamp
+                        reminderTimestamp = reminderTimestamp,
+                        colorHex = colorHex
                     )
                 )
+                if (reminderTimestamp != null && reminderTimestamp > System.currentTimeMillis()) {
+                    scheduleNoteAlarm(id, title, content, reminderTimestamp)
+                }
             }
         }
     }
@@ -226,6 +239,33 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
     fun deleteNote(note: NoteEntity) {
         viewModelScope.launch {
             noteDao.deleteNote(note)
+        }
+    }
+
+    private fun scheduleNoteAlarm(id: Long, title: String, content: String, triggerAtMillis: Long) {
+        val context = getApplication<Application>()
+        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+
+        val intent = Intent(context, NoteAlarmReceiver::class.java).apply {
+            putExtra("NOTE_TITLE", title.ifBlank { "Заметка" })
+            putExtra("NOTE_CONTENT", content)
+        }
+
+        val pendingIntent = PendingIntent.getBroadcast(
+            context,
+            id.toInt(),
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        try {
+            alarmManager.setExactAndAllowWhileIdle(
+                AlarmManager.RTC_WAKEUP,
+                triggerAtMillis,
+                pendingIntent
+            )
+        } catch (e: SecurityException) {
+            e.printStackTrace()
         }
     }
 
