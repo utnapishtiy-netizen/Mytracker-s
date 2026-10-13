@@ -13,11 +13,10 @@ class StepCounterManager(context: Context) : SensorEventListener {
     private val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
     private val stepSensor: Sensor? = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_COUNTER)
 
+    private val sharedPrefs = context.getSharedPreferences("step_counter_prefs", Context.MODE_PRIVATE)
+
     private val _stepCount = MutableStateFlow(0)
     val stepCount: StateFlow<Int> = _stepCount
-
-    private var initialSensorSteps = -1
-    private var lastRecordedDate: String = LocalDate.now().toString()
 
     fun startListening() {
         stepSensor?.let {
@@ -39,16 +38,27 @@ class StepCounterManager(context: Context) : SensorEventListener {
             val totalStepsFromBoot = event.values[0].toInt()
             val currentDate = LocalDate.now().toString()
 
-            if (currentDate != lastRecordedDate) {
-                lastRecordedDate = currentDate
-                initialSensorSteps = totalStepsFromBoot
+            val savedDate = sharedPrefs.getString("saved_date", "")
+            var initialSteps = sharedPrefs.getInt("initial_steps", -1)
+
+            // Если наступил новый день или приложение запускается впервые после сброса
+            if (currentDate != savedDate || initialSteps == -1) {
+                initialSteps = totalStepsFromBoot
+                sharedPrefs.edit()
+                    .putString("saved_date", currentDate)
+                    .putInt("initial_steps", initialSteps)
+                    .apply()
             }
 
-            if (initialSensorSteps == -1) {
-                initialSensorSteps = totalStepsFromBoot
+            // Защита на случай перезагрузки телефона (когда totalStepsFromBoot стал меньше initialSteps)
+            if (totalStepsFromBoot < initialSteps) {
+                initialSteps = totalStepsFromBoot
+                sharedPrefs.edit()
+                    .putInt("initial_steps", initialSteps)
+                    .apply()
             }
 
-            val stepsToday = maxOf(0, totalStepsFromBoot - initialSensorSteps)
+            val stepsToday = maxOf(0, totalStepsFromBoot - initialSteps)
             _stepCount.value = stepsToday
         }
     }
