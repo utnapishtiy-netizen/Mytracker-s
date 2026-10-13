@@ -181,6 +181,23 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    fun updateNote(id: Long, title: String, content: String) {
+        viewModelScope.launch {
+            // Находим текущую заметку, чтобы сохранить оригинальный timestamp, либо обновляем с новым
+            val existingNotes = notes.value
+            val target = existingNotes.find { it.id == id }
+            if (target != null) {
+                noteDao.insertNote(
+                    target.copy(
+                        title = title.trim(),
+                        content = content.trim(),
+                        timestamp = System.currentTimeMillis() // обновляем время изменения (по желанию)
+                    )
+                )
+            }
+        }
+    }
+    
     fun updateCustomProgress(activityId: Long, exactCount: Int, goal: Int) {
         viewModelScope.launch {
             dao.insertOrUpdateProgress(
