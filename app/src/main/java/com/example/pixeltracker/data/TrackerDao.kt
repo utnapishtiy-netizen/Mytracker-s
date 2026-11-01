@@ -1,9 +1,11 @@
 package com.example.pixeltracker.data
 
 import androidx.room.Dao
+import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -18,7 +20,6 @@ interface TrackerDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertOrUpdate(tracker: DailyTracker)
 
-    // Точечные апдейты для предотвращения затирания данных
     @Query("UPDATE daily_tracker SET stepsCount = :steps WHERE date = :date")
     suspend fun updateSteps(date: String, steps: Int)
 
@@ -41,11 +42,9 @@ interface TrackerDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertCustomActivity(activity: CustomActivityEntity)
 
-    // Удаление кастомной активности по её ID
     @Query("DELETE FROM custom_activities WHERE id = :activityId")
     suspend fun deleteCustomActivity(activityId: Long)
 
-    // Удаление прогресса удаленной активности за день
     @Query("DELETE FROM activity_progress WHERE activityId = :activityId")
     suspend fun deleteProgressForActivity(activityId: Long)
 
@@ -54,4 +53,17 @@ interface TrackerDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertOrUpdateProgress(progress: ActivityProgressEntity)
+
+    // Методы для заметок (Notes)
+    @Query("SELECT * FROM notes ORDER BY id DESC")
+    fun getAllNotes(): Flow<List<NoteEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertNote(note: NoteEntity)
+
+    @Update
+    suspend fun updateNote(note: NoteEntity)
+
+    @Delete
+    suspend fun deleteNote(note: NoteEntity)
 }
