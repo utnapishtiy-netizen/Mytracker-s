@@ -197,16 +197,15 @@ fun MainTrackerApp(
         is Screen.Tracker -> {
             Scaffold(
                 topBar = {
-                    LargeTopAppBar(
+                    TopAppBar(
                         title = {
-                            Column {
-                                Text("MyTracker", fontWeight = FontWeight.Bold)
-                                Text(
-                                    "🔥 Стрик: $streak дн.",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                            }
+                            // Название приложения удалено, оставляем только стрик или пустой блок
+                            Text(
+                                "🔥 Стрик: $streak дн.",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Bold
+                            )
                         },
                         actions = {
                             IconButton(onClick = { viewModel.refreshData() }) {
@@ -290,7 +289,7 @@ fun MainTrackerApp(
                         val goalCount = progressItem?.goalCount ?: activity.defaultGoal
 
                         MetricCard(
-                            title = activity.name, value = "$currentCount", unit = "${activity.unit} / $goalCount",
+                            title = activity.name, value = "$currentCount", unit = "${activity.unit} /$goalCount",
                             progress = if (goalCount > 0) currentCount.toFloat() / goalCount else 0f,
                             icon = Icons.Rounded.Star,
                             containerColor = MaterialTheme.colorScheme.secondaryContainer,
@@ -448,7 +447,7 @@ fun HistoryScreen(historyList: List<DailyTracker>, onBackClick: () -> Unit) {
                 ) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Text(
-                            text = "📅 ${currentYearMonth.month.name} ${currentYearMonth.year}",
+                            text = "📅 ${currentYearMonth.month.name}${currentYearMonth.year}",
                             style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary
                         )
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceAround) {
@@ -494,10 +493,10 @@ fun HistoryScreen(historyList: List<DailyTracker>, onBackClick: () -> Unit) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text(text = "📅 ${day.date}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                         Divider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
-                        Text("👣 Шаги: ${day.stepsCount} / ${day.stepsGoal}")
+                        Text("👣 Шаги: ${day.stepsCount} /${day.stepsGoal}")
                         Text("📍 Дистанция: ${day.distanceKm} км / ${day.distanceGoalKm} км")
-                        Text("💪 Отжимания: ${day.pushUpsCount} / ${day.pushUpsGoal}")
-                        Text("🦵 Приседания: ${day.squatsCount} / ${day.squatsGoal}")
+                        Text("💪 Отжимания: ${day.pushUpsCount} /${day.pushUpsGoal}")
+                        Text("🦵 Приседания: ${day.squatsCount} /${day.squatsGoal}")
                     }
                 }
             }
@@ -553,75 +552,4 @@ fun GoalsSettingsDialog(
                 OutlinedTextField(value = steps, onValueChange = { steps = it }, label = { Text("Цель по шагам") }, singleLine = true, shape = RoundedCornerShape(16.dp))
                 OutlinedTextField(value = distance, onValueChange = { distance = it }, label = { Text("Цель по дистанции (км)") }, singleLine = true, shape = RoundedCornerShape(16.dp))
                 OutlinedTextField(value = pushUps, onValueChange = { pushUps = it }, label = { Text("Цель по отжиманиям") }, singleLine = true, shape = RoundedCornerShape(16.dp))
-                OutlinedTextField(value = squats, onValueChange = { squats = it }, label = { Text("Цель по приседаниям") }, singleLine = true, shape = RoundedCornerShape(16.dp))
-
-                Spacer(modifier = Modifier.height(4.dp))
-                Button(onClick = onBackupClick, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
-                    Icon(imageVector = Icons.Rounded.CloudUpload, contentDescription = null)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Создать бэкап")
-                }
-                OutlinedButton(onClick = onRestoreClick, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
-                    Icon(imageVector = Icons.Rounded.CloudDownload, contentDescription = null)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Восстановить из файла")
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = {
-                val pU = pushUps.toIntOrNull() ?: currentPushUpsGoal
-                val sQ = squats.toIntOrNull() ?: currentSquatsGoal
-                val sG = steps.toIntOrNull() ?: currentStepsGoal
-                val dG = distance.toFloatOrNull() ?: currentDistanceGoal
-                onSave(pU, sQ, sG, dG)
-            }) { Text("Сохранить") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } },
-        shape = RoundedCornerShape(28.dp)
-    )
-}
-
-@Composable
-fun MetricCard(
-    title: String, value: String, unit: String, progress: Float, icon: ImageVector,
-    containerColor: Color, contentColor: Color,
-    onActionClick: (() -> Unit)? = null, onEditClick: (() -> Unit)? = null, onDeleteClick: (() -> Unit)? = null
-) {
-    Card(
-        shape = RoundedCornerShape(28.dp), colors = CardDefaults.cardColors(containerColor = containerColor),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        modifier = Modifier.fillMaxWidth().let { if (onEditClick != null) it.clickable(onClick = onEditClick) else it }
-    ) {
-        Column(modifier = Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Icon(imageVector = icon, contentDescription = null, tint = contentColor, modifier = Modifier.size(28.dp))
-                    Text(text = title, style = MaterialTheme.typography.titleMedium, color = contentColor, fontWeight = FontWeight.Bold)
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (onDeleteClick != null) {
-                        FilledIconButton(onClick = onDeleteClick, shape = RoundedCornerShape(16.dp), colors = IconButtonDefaults.filledIconButtonColors(containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.8f))) {
-                            Icon(imageVector = Icons.Rounded.Delete, contentDescription = "Удалить", tint = MaterialTheme.colorScheme.onErrorContainer)
-                        }
-                    }
-                    if (onEditClick != null) {
-                        FilledIconButton(onClick = onEditClick, shape = RoundedCornerShape(16.dp), colors = IconButtonDefaults.filledIconButtonColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.6f))) {
-                            Icon(imageVector = Icons.Rounded.Edit, contentDescription = "Править", tint = MaterialTheme.colorScheme.onSurface)
-                        }
-                    }
-                    if (onActionClick != null) {
-                        FilledIconButton(onClick = onActionClick, shape = RoundedCornerShape(16.dp), colors = IconButtonDefaults.filledIconButtonColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.6f))) {
-                            Icon(imageVector = Icons.Rounded.Add, contentDescription = "Добавить", tint = MaterialTheme.colorScheme.onSurface)
-                        }
-                    }
-                }
-            }
-            Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(text = value, style = MaterialTheme.typography.displayMedium, fontWeight = FontWeight.ExtraBold, color = contentColor)
-                Text(text = unit, style = MaterialTheme.typography.bodyLarge, color = contentColor.copy(alpha = 0.8f), modifier = Modifier.padding(bottom = 8.dp))
-            }
-            LinearProgressIndicator(progress = { progress.coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth().height(16.dp).clip(RoundedCornerShape(8.dp)), color = contentColor, trackColor = contentColor.copy(alpha = 0.15f))
-        }
-    }
-}
+                OutlinedTextField(value = squats, onValueChange = { squats = it }, label = { Text("Цель по приседаниям") }, singleLine = true, shape = RoundedCorner
