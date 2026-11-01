@@ -12,10 +12,11 @@ import androidx.room.RoomDatabase
         ActivityProgressEntity::class,
         NoteEntity::class
     ],
-    version = 5,
+    version = 2,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
+
     abstract fun trackerDao(): TrackerDao
     abstract fun noteDao(): NoteDao
 
@@ -30,7 +31,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "pixel_tracker_database"
                 )
-                    .fallbackToDestructiveMigration()
+                    .fallbackToDestructiveMigration() // Безопасное обновление схемы для GitHub CI/CD сборки
                     .build()
                 INSTANCE = instance
                 instance
