@@ -31,7 +31,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "pixel_tracker_database"
                 )
-                    .fallbackToDestructiveMigration() // Безопасное обновление схемы для GitHub CI/CD сборки
+                    .fallbackToDestructiveMigration()
                     .build()
                 INSTANCE = instance
                 instance
