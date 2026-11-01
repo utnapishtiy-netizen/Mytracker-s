@@ -1,6 +1,8 @@
 package com.example.pixeltracker
 
 import android.Manifest
+import android.app.Activity
+import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
@@ -14,7 +16,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -37,6 +39,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.work.*
 import com.example.pixeltracker.data.AppDatabase
 import com.example.pixeltracker.data.BackupWorker
+import com.example.pixeltracker.data.ReminderWorker
+import com.example.pixeltracker.ui.AchievementsScreen
 import com.example.pixeltracker.ui.NotesScreen
 import com.example.pixeltracker.ui.StatsScreen
 import com.example.pixeltracker.ui.TrackerViewModel
@@ -45,7 +49,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.BufferedReader
 import java.io.File
+import java.io.InputStreamReader
 import java.text.SimpleDateFormat
 import java.time.YearMonth
 import java.util.Date
@@ -58,38 +64,75 @@ class MainActivity : ComponentActivity() {
         ActivityResultContracts.RequestMultiplePermissions()
     ) { _ -> }
 
+    private val openFileLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            result.data?.data?.let { uri ->
+                try {
+                    contentResolver.openInputStream(uri)?.use { inputStream ->
+                        BufferedReader(InputStreamReader(inputStream)).use { reader ->
+                            val content = reader.readText()
+                            Toast.makeText(this, "Бэкап успешно прочитан (${content.length} символов)", Toast.LENGTH_LONG).show()
+                        }
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    Toast.makeText(this, "Ошибка чтения файла бэкапа", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
+    fun triggerFilePicker() {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "text/plain"
+        }
+        openFileLauncher.launch(intent)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val permissions = mutableListOf(
-            Manifest.permission.ACTIVITY_RECOGNITION
-        )
+        val permissions = mutableListOf(Manifest.permission.ACTIVITY_RECOGNITION)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             permissions.add(Manifest.permission.POST_NOTIFICATIONS)
         }
         requestPermissionLauncher.launch(permissions.toTypedArray())
 
+        // Фоновый бэкап раз в сутки
         val backupRequest = PeriodicWorkRequestBuilder<BackupWorker>(24, TimeUnit.HOURS)
-            .setConstraints(
-                Constraints.Builder()
-                    .setRequiresDeviceIdle(true)
-                    .build()
-            )
+            .setConstraints(Constraints.Builder().setRequiresDeviceIdle(true).build())
             .build()
-
         WorkManager.getInstance(applicationContext).enqueueUniquePeriodicWork(
-            "MyTrackerDailyBackup",
-            ExistingPeriodicWorkPolicy.KEEP,
-            backupRequest
+            "MyTrackerDailyBackup", ExistingPeriodicWorkPolicy.KEEP, backupRequest
+        )
+
+        // Вечернее напоминание в 20:00
+        val reminderRequest = PeriodicWorkRequestBuilder<ReminderWorker>(24, TimeUnit.HOURS).build()
+        WorkManager.getInstance(applicationContext).enqueueUniquePeriodicWork(
+            "MyTrackerReminder", ExistingPeriodicWorkPolicy.KEEP, reminderRequest
         )
 
         setContent {
-            PixelTrackerTheme {
+            var darkThemeMode by remember { mutableStateOf(2) } // 0: Системная, 1: Светлая, 2: Темная
+            val useDarkTheme = when (darkThemeMode) {
+                1 -> false
+                2 -> true
+                else -> androidx.compose.foundation.isSystemInDarkTheme()
+            }
+
+            PixelTrackerTheme(darkTheme = useDarkTheme) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    MainTrackerApp()
+                    MainTrackerApp(
+                        darkThemeMode = darkThemeMode,
+                        onThemeChange = { darkThemeMode = it },
+                        onImportClick = { triggerFilePicker() }
+                    )
                 }
             }
         }
@@ -101,6 +144,7 @@ sealed class Screen {
     object Notes : Screen()
     object History : Screen()
     object Stats : Screen()
+    object Achievements : Screen()
 }
 
 sealed class EditMetricType {
@@ -111,7 +155,12 @@ sealed class EditMetricType {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MainTrackerApp(viewModel: TrackerViewModel = viewModel()) {
+fun MainTrackerApp(
+    viewModel: TrackerViewModel = viewModel(),
+    darkThemeMode: Int,
+    onThemeChange: (Int) -> Unit,
+    onImportClick: () -> Unit
+) {
     var currentScreen by remember { mutableStateOf<Screen>(Screen.Tracker) }
     var showSettingsDialog by remember { mutableStateOf(false) }
     var showAddActivityDialog by remember { mutableStateOf(false) }
@@ -135,22 +184,16 @@ fun MainTrackerApp(viewModel: TrackerViewModel = viewModel()) {
 
     when (currentScreen) {
         is Screen.Notes -> {
-            NotesScreen(
-                viewModel = viewModel,
-                onBackClick = { currentScreen = Screen.Tracker }
-            )
+            NotesScreen(viewModel = viewModel, onBackClick = { currentScreen = Screen.Tracker })
         }
         is Screen.History -> {
-            HistoryScreen(
-                historyList = historyList,
-                onBackClick = { currentScreen = Screen.Tracker }
-            )
+            HistoryScreen(historyList = historyList, onBackClick = { currentScreen = Screen.Tracker })
         }
         is Screen.Stats -> {
-            StatsScreen(
-                historyList = historyList,
-                onBackClick = { currentScreen = Screen.Tracker }
-            )
+            StatsScreen(historyList = historyList, onBackClick = { currentScreen = Screen.Tracker })
+        }
+        is Screen.Achievements -> {
+            AchievementsScreen(historyList = historyList, currentStreak = streak, onBackClick = { currentScreen = Screen.Tracker })
         }
         is Screen.Tracker -> {
             Scaffold(
@@ -170,17 +213,20 @@ fun MainTrackerApp(viewModel: TrackerViewModel = viewModel()) {
                             IconButton(onClick = { viewModel.refreshData() }) {
                                 Icon(imageVector = Icons.Rounded.Refresh, contentDescription = "Обновить")
                             }
+                            IconButton(onClick = { currentScreen = Screen.Achievements }) {
+                                Icon(imageVector = Icons.Rounded.EmojiEvents, contentDescription = "Достижения")
+                            }
                             IconButton(onClick = { currentScreen = Screen.Stats }) {
                                 Icon(imageVector = Icons.Rounded.BarChart, contentDescription = "Статистика")
                             }
                             IconButton(onClick = { currentScreen = Screen.History }) {
-                                Icon(imageVector = Icons.Rounded.CalendarMonth, contentDescription = "Календарь истории")
+                                Icon(imageVector = Icons.Rounded.CalendarMonth, contentDescription = "Календарь")
                             }
                             IconButton(onClick = { currentScreen = Screen.Notes }) {
                                 Icon(imageVector = Icons.Rounded.Note, contentDescription = "Заметки")
                             }
                             IconButton(onClick = { showSettingsDialog = true }) {
-                                Icon(imageVector = Icons.Rounded.Settings, contentDescription = "Настройки целей")
+                                Icon(imageVector = Icons.Rounded.Settings, contentDescription = "Настройки")
                             }
                         }
                     )
@@ -191,7 +237,7 @@ fun MainTrackerApp(viewModel: TrackerViewModel = viewModel()) {
                         containerColor = MaterialTheme.colorScheme.primaryContainer,
                         contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                     ) {
-                        Icon(imageVector = Icons.Rounded.Add, contentDescription = "Добавить активность")
+                        Icon(imageVector = Icons.Rounded.Add, contentDescription = "Добавить")
                     }
                 }
             ) { innerPadding ->
@@ -204,9 +250,7 @@ fun MainTrackerApp(viewModel: TrackerViewModel = viewModel()) {
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     MetricCard(
-                        title = "Шаги",
-                        value = "$steps",
-                        unit = "/ $stepsGoal",
+                        title = "Шаги", value = "$steps", unit = "/ $stepsGoal",
                         progress = if (stepsGoal > 0) steps.toFloat() / stepsGoal else 0f,
                         icon = Icons.Rounded.DirectionsWalk,
                         containerColor = MaterialTheme.colorScheme.primaryContainer,
@@ -214,9 +258,7 @@ fun MainTrackerApp(viewModel: TrackerViewModel = viewModel()) {
                     )
 
                     MetricCard(
-                        title = "Дистанция",
-                        value = "%.2f".format(distance),
-                        unit = "км / $distanceGoal км",
+                        title = "Дистанция", value = "%.2f".format(distance), unit = "км / $distanceGoal км",
                         progress = if (distanceGoal > 0f) distance / distanceGoal else 0f,
                         icon = Icons.Rounded.Map,
                         containerColor = MaterialTheme.colorScheme.secondaryContainer,
@@ -224,9 +266,7 @@ fun MainTrackerApp(viewModel: TrackerViewModel = viewModel()) {
                     )
 
                     MetricCard(
-                        title = "Отжимания",
-                        value = "$pushUps",
-                        unit = "/ $pushUpsGoal",
+                        title = "Отжимания", value = "$pushUps", unit = "/ $pushUpsGoal",
                         progress = if (pushUpsGoal > 0) pushUps.toFloat() / pushUpsGoal else 0f,
                         icon = Icons.Rounded.FitnessCenter,
                         containerColor = MaterialTheme.colorScheme.tertiaryContainer,
@@ -236,9 +276,7 @@ fun MainTrackerApp(viewModel: TrackerViewModel = viewModel()) {
                     )
 
                     MetricCard(
-                        title = "Приседания",
-                        value = "$squats",
-                        unit = "/ $squatsGoal",
+                        title = "Приседания", value = "$squats", unit = "/ $squatsGoal",
                         progress = if (squatsGoal > 0) squats.toFloat() / squatsGoal else 0f,
                         icon = Icons.Rounded.AccessibilityNew,
                         containerColor = MaterialTheme.colorScheme.surfaceVariant,
@@ -253,9 +291,7 @@ fun MainTrackerApp(viewModel: TrackerViewModel = viewModel()) {
                         val goalCount = progressItem?.goalCount ?: activity.defaultGoal
 
                         MetricCard(
-                            title = activity.name,
-                            value = "$currentCount",
-                            unit = "${activity.unit} / $goalCount",
+                            title = activity.name, value = "$currentCount", unit = "${activity.unit} / $goalCount",
                             progress = if (goalCount > 0) currentCount.toFloat() / goalCount else 0f,
                             icon = Icons.Rounded.Star,
                             containerColor = MaterialTheme.colorScheme.secondaryContainer,
@@ -265,7 +301,6 @@ fun MainTrackerApp(viewModel: TrackerViewModel = viewModel()) {
                             onDeleteClick = { activityToDelete = activity }
                         )
                     }
-                    
                     Spacer(modifier = Modifier.height(64.dp))
                 }
             }
@@ -278,16 +313,11 @@ fun MainTrackerApp(viewModel: TrackerViewModel = viewModel()) {
             title = { Text("Удалить активность?") },
             text = { Text("Вы действительно хотите удалить «${activity.name}»?") },
             confirmButton = {
-                TextButton(onClick = {
-                    viewModel.deleteCustomActivity(activity.id)
-                    activityToDelete = null
-                }) {
+                TextButton(onClick = { viewModel.deleteCustomActivity(activity.id); activityToDelete = null }) {
                     Text("Удалить", color = MaterialTheme.colorScheme.error)
                 }
             },
-            dismissButton = {
-                TextButton(onClick = { activityToDelete = null }) { Text("Отмена") }
-            },
+            dismissButton = { TextButton(onClick = { activityToDelete = null }) { Text("Отмена") } },
             shape = RoundedCornerShape(28.dp)
         )
     }
@@ -302,23 +332,14 @@ fun MainTrackerApp(viewModel: TrackerViewModel = viewModel()) {
                 }
             )
         }
-        val titleText = when (metric) {
-            is EditMetricType.PushUps -> "Отжимания: точное значение"
-            is EditMetricType.Squats -> "Приседания: точное значение"
-            is EditMetricType.Custom -> "Корректировка: ${metric.title}"
-        }
-
         AlertDialog(
             onDismissRequest = { editingMetric = null },
-            title = { Text(titleText) },
+            title = { Text("Корректировка значения") },
             text = {
                 OutlinedTextField(
-                    value = inputVal,
-                    onValueChange = { inputVal = it },
-                    label = { Text("Значение") },
-                    singleLine = true,
-                    shape = RoundedCornerShape(16.dp),
-                    modifier = Modifier.fillMaxWidth()
+                    value = inputVal, onValueChange = { inputVal = it },
+                    label = { Text("Значение") }, singleLine = true,
+                    shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()
                 )
             },
             confirmButton = {
@@ -330,13 +351,9 @@ fun MainTrackerApp(viewModel: TrackerViewModel = viewModel()) {
                         is EditMetricType.Custom -> viewModel.updateCustomProgress(metric.activityId, newVal, metric.goal)
                     }
                     editingMetric = null
-                }) {
-                    Text("Установить")
-                }
+                }) { Text("Установить") }
             },
-            dismissButton = {
-                TextButton(onClick = { editingMetric = null }) { Text("Отмена") }
-            },
+            dismissButton = { TextButton(onClick = { editingMetric = null }) { Text("Отмена") } },
             shape = RoundedCornerShape(28.dp)
         )
     }
@@ -344,10 +361,7 @@ fun MainTrackerApp(viewModel: TrackerViewModel = viewModel()) {
     if (showAddActivityDialog) {
         AddCustomActivityDialog(
             onDismiss = { showAddActivityDialog = false },
-            onConfirm = { name, unit, goal ->
-                viewModel.addCustomActivity(name, unit, goal)
-                showAddActivityDialog = false
-            }
+            onConfirm = { name, unit, goal -> viewModel.addCustomActivity(name, unit, goal); showAddActivityDialog = false }
         )
     }
 
@@ -356,15 +370,12 @@ fun MainTrackerApp(viewModel: TrackerViewModel = viewModel()) {
         val currentContext = LocalContext.current
 
         GoalsSettingsDialog(
-            currentPushUpsGoal = pushUpsGoal,
-            currentSquatsGoal = squatsGoal,
-            currentStepsGoal = stepsGoal,
-            currentDistanceGoal = distanceGoal,
+            currentPushUpsGoal = pushUpsGoal, currentSquatsGoal = squatsGoal,
+            currentStepsGoal = stepsGoal, currentDistanceGoal = distanceGoal,
+            darkThemeMode = darkThemeMode,
+            onThemeChange = onThemeChange,
             onDismiss = { showSettingsDialog = false },
-            onSave = { pU, sQ, sG, dG ->
-                viewModel.updateGoals(pU, sQ, sG, dG)
-                showSettingsDialog = false
-            },
+            onSave = { pU, sQ, sG, dG -> viewModel.updateGoals(pU, sQ, sG, dG); showSettingsDialog = false },
             onBackupClick = {
                 coroutineScope.launch(Dispatchers.IO) {
                     try {
@@ -377,11 +388,11 @@ fun MainTrackerApp(viewModel: TrackerViewModel = viewModel()) {
                         val timestamp = SimpleDateFormat("yyyy-MM-dd_HH-mm", Locale.getDefault()).format(Date())
                         val backupContent = buildString {
                             appendLine("=== MYTRACKER MANUAL BACKUP ($timestamp) ===")
-                            appendLine("\n--- HISTORY (${history.size}) ---")
+                            appendLine("\n--- HISTORY ---")
                             history.forEach { appendLine(it.toString()) }
-                            appendLine("\n--- CUSTOM ACTIVITIES (${customActivities.size}) ---")
+                            appendLine("\n--- CUSTOM ACTIVITIES ---")
                             customActivities.forEach { appendLine(it.toString()) }
-                            appendLine("\n--- NOTES (${notes.size}) ---")
+                            appendLine("\n--- NOTES ---")
                             notes.forEach { appendLine(it.toString()) }
                         }
 
@@ -389,15 +400,17 @@ fun MainTrackerApp(viewModel: TrackerViewModel = viewModel()) {
                         file.writeText(backupContent)
 
                         withContext(Dispatchers.Main) {
-                            Toast.makeText(currentContext, "Бэкап сохранен в файлы устройства!", Toast.LENGTH_LONG).show()
+                            Toast.makeText(currentContext, "Бэкап сохранен в файлы!", Toast.LENGTH_LONG).show()
                         }
                     } catch (e: Exception) {
                         e.printStackTrace()
-                        withContext(Dispatchers.Main) {
-                            Toast.makeText(currentContext, "Ошибка создания бэкапа", Toast.LENGTH_SHORT).show()
-                        }
+                        withContext(Dispatchers.Main) { Toast.makeText(currentContext, "Ошибка бэкапа", Toast.LENGTH_SHORT).show() }
                     }
                 }
+            },
+            onRestoreClick = {
+                showSettingsDialog = false
+                onImportClick()
             }
         )
     }
@@ -405,17 +418,11 @@ fun MainTrackerApp(viewModel: TrackerViewModel = viewModel()) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HistoryScreen(
-    historyList: List<com.example.pixeltracker.data.DailyTracker>,
-    onBackClick: () -> Unit
-) {
+fun HistoryScreen(historyList: List<com.example.pixeltracker.data.DailyTracker>, onBackClick: () -> Unit) {
     val currentYearMonth = remember { YearMonth.now() }
     val daysInMonth = remember { currentYearMonth.lengthOfMonth() }
     val firstDayOfWeek = remember { currentYearMonth.atDay(1).dayOfWeek.value }
-
-    val historyMap = remember(historyList) {
-        historyList.associateBy { it.date }
-    }
+    val historyMap = remember(historyList) { historyList.associateBy { it.date } }
 
     Scaffold(
         topBar = {
@@ -430,10 +437,7 @@ fun HistoryScreen(
         }
     ) { innerPadding ->
         LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .padding(horizontal = 20.dp),
+            modifier = Modifier.fillMaxSize().padding(innerPadding).padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
             contentPadding = PaddingValues(vertical = 12.dp)
         ) {
@@ -443,133 +447,58 @@ fun HistoryScreen(
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Text(
                             text = "📅 ${currentYearMonth.month.name} ${currentYearMonth.year}",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
+                            style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary
                         )
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceAround
-                        ) {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceAround) {
                             listOf("Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс").forEach { dayName ->
-                                Text(
-                                    text = dayName,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    textAlign = TextAlign.Center,
-                                    modifier = Modifier.width(36.dp)
-                                )
+                                Text(text = dayName, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center, modifier = Modifier.width(36.dp))
                             }
                         }
-
                         LazyVerticalGrid(
-                            columns = GridCells.Fixed(7),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(240.dp),
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            verticalArrangement = Arrangement.spacedBy(4.dp),
-                            userScrollEnabled = false
+                            columns = GridCells.Fixed(7), modifier = Modifier.fillMaxWidth().height(240.dp),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp), verticalArrangement = Arrangement.spacedBy(4.dp), userScrollEnabled = false
                         ) {
-                            items(firstDayOfWeek - 1) {
-                                Box(modifier = Modifier.size(36.dp))
-                            }
-
+                            items(firstDayOfWeek - 1) { Box(modifier = Modifier.size(36.dp)) }
                             items(daysInMonth) { dayIndex ->
                                 val dayNum = dayIndex + 1
                                 val dateStr = String.format("%d-%02d-%02d", currentYearMonth.year, currentYearMonth.monthValue, dayNum)
                                 val tracker = historyMap[dateStr]
-
-                                val isCompleted = tracker != null && (
-                                        tracker.stepsCount >= tracker.stepsGoal ||
-                                                tracker.pushUpsCount >= tracker.pushUpsGoal ||
-                                                tracker.squatsCount >= tracker.squatsGoal ||
-                                                tracker.distanceKm >= tracker.distanceGoalKm
-                                        )
-
+                                val isCompleted = tracker != null && (tracker.stepsCount >= tracker.stepsGoal || tracker.pushUpsCount >= tracker.pushUpsGoal || tracker.squatsCount >= tracker.squatsGoal || tracker.distanceKm >= tracker.distanceGoalKm)
                                 val cellColor = when {
                                     isCompleted -> MaterialTheme.colorScheme.primaryContainer
                                     tracker != null -> MaterialTheme.colorScheme.secondaryContainer
                                     else -> MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
                                 }
-
                                 val textColor = when {
                                     isCompleted -> MaterialTheme.colorScheme.onPrimaryContainer
                                     tracker != null -> MaterialTheme.colorScheme.onSecondaryContainer
                                     else -> MaterialTheme.colorScheme.onSurfaceVariant
                                 }
-
-                                Box(
-                                    modifier = Modifier
-                                        .size(36.dp)
-                                        .clip(CircleShape)
-                                        .background(cellColor),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = "$dayNum",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = if (isCompleted) FontWeight.Bold else FontWeight.Normal,
-                                        color = textColor
-                                    )
+                                Box(modifier = Modifier.size(36.dp).clip(CircleShape).background(cellColor), contentAlignment = Alignment.Center) {
+                                    Text(text = "$dayNum", style = MaterialTheme.typography.bodyMedium, fontWeight = if (isCompleted) FontWeight.Bold else FontWeight.Normal, color = textColor)
                                 }
                             }
                         }
                     }
                 }
             }
-
-            item {
-                Text(
-                    text = "История результатов",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(top = 8.dp)
-                )
-            }
-
-            if (historyList.isEmpty()) {
-                item {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 32.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text("История пока пуста. Начните выполнять цели!", style = MaterialTheme.typography.bodyLarge)
-                    }
-                }
-            } else {
-                items(historyList) { day ->
-                    Card(
-                        shape = RoundedCornerShape(20.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Text(
-                                text = "📅 ${day.date}",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                            Divider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
-                            Text("👣 Шаги: ${day.stepsCount} / ${day.stepsGoal}")
-                            Text("📍 Дистанция: ${day.distanceKm} км / ${day.distanceGoalKm} км")
-                            Text("💪 Отжимания: ${day.pushUpsCount} / ${day.pushUpsGoal}")
-                            Text("🦵 Приседания: ${day.squatsCount} / ${day.squatsGoal}")
-                        }
+            item { Text("История результатов", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp)) }
+            items(historyList) { day ->
+                Card(
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(text = "📅 ${day.date}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                        Divider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+                        Text("👣 Шаги: ${day.stepsCount} / ${day.stepsGoal}")
+                        Text("📍 Дистанция: ${day.distanceKm} км / ${day.distanceGoalKm} км")
+                        Text("💪 Отжимания: ${day.pushUpsCount} / ${day.pushUpsGoal}")
+                        Text("🦵 Приседания: ${day.squatsCount} / ${day.squatsGoal}")
                     }
                 }
             }
@@ -578,71 +507,32 @@ fun HistoryScreen(
 }
 
 @Composable
-fun AddCustomActivityDialog(
-    onDismiss: () -> Unit,
-    onConfirm: (String, String, Int) -> Unit
-) {
+fun AddCustomActivityDialog(onDismiss: () -> Unit, onConfirm: (String, String, Int) -> Unit) {
     var name by remember { mutableStateOf("") }
     var unit by remember { mutableStateOf("") }
     var goal by remember { mutableStateOf("50") }
-
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Новая активность") },
         text = {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.verticalScroll(rememberScrollState())
-            ) {
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text("Название (например: Подтягивания)") },
-                    singleLine = true,
-                    shape = RoundedCornerShape(16.dp)
-                )
-                OutlinedTextField(
-                    value = unit,
-                    onValueChange = { unit = it },
-                    label = { Text("Единица (например: раз, мин)") },
-                    singleLine = true,
-                    shape = RoundedCornerShape(16.dp)
-                )
-                OutlinedTextField(
-                    value = goal,
-                    onValueChange = { goal = it },
-                    label = { Text("Цель") },
-                    singleLine = true,
-                    shape = RoundedCornerShape(16.dp)
-                )
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.verticalScroll(rememberScrollState())) {
+                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Название") }, singleLine = true, shape = RoundedCornerShape(16.dp))
+                OutlinedTextField(value = unit, onValueChange = { unit = it }, label = { Text("Единица (раз, мин)") }, singleLine = true, shape = RoundedCornerShape(16.dp))
+                OutlinedTextField(value = goal, onValueChange = { goal = it }, label = { Text("Цель") }, singleLine = true, shape = RoundedCornerShape(16.dp))
             }
         },
-        confirmButton = {
-            TextButton(onClick = {
-                if (name.isNotBlank()) {
-                    val g = goal.toIntOrNull() ?: 50
-                    onConfirm(name.trim(), unit.trim().ifBlank { "раз" }, g)
-                }
-            }) {
-                Text("Создать")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Отмена") }
-        },
+        confirmButton = { TextButton(onClick = { if (name.isNotBlank()) onConfirm(name.trim(), unit.trim().ifBlank { "раз" }, goal.toIntOrNull() ?: 50) }) { Text("Создать") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } },
         shape = RoundedCornerShape(28.dp)
     )
 }
 
 @Composable
 fun GoalsSettingsDialog(
-    currentPushUpsGoal: Int,
-    currentSquatsGoal: Int,
-    currentStepsGoal: Int,
-    currentDistanceGoal: Float,
-    onDismiss: () -> Unit,
-    onSave: (Int, Int, Int, Float) -> Unit,
-    onBackupClick: () -> Unit
+    currentPushUpsGoal: Int, currentSquatsGoal: Int, currentStepsGoal: Int, currentDistanceGoal: Float,
+    darkThemeMode: Int, onThemeChange: (Int) -> Unit,
+    onDismiss: () -> Unit, onSave: (Int, Int, Int, Float) -> Unit,
+    onBackupClick: () -> Unit, onRestoreClick: () -> Unit
 ) {
     var pushUps by remember { mutableStateOf(currentPushUpsGoal.toString()) }
     var squats by remember { mutableStateOf(currentSquatsGoal.toString()) }
@@ -653,204 +543,82 @@ fun GoalsSettingsDialog(
         onDismissRequest = onDismiss,
         title = { Text("Настройки и бэкап") },
         text = {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.verticalScroll(rememberScrollState())
-            ) {
-                OutlinedTextField(
-                    value = steps,
-                    onValueChange = { steps = it },
-                    label = { Text("Цель по шагам") },
-                    singleLine = true,
-                    shape = RoundedCornerShape(16.dp)
-                )
-                OutlinedTextField(
-                    value = distance,
-                    onValueChange = { distance = it },
-                    label = { Text("Цель по дистанции (км)") },
-                    singleLine = true,
-                    shape = RoundedCornerShape(16.dp)
-                )
-                OutlinedTextField(
-                    value = pushUps,
-                    onValueChange = { pushUps = it },
-                    label = { Text("Цель по отжиманиям") },
-                    singleLine = true,
-                    shape = RoundedCornerShape(16.dp)
-                )
-                OutlinedTextField(
-                    value = squats,
-                    onValueChange = { squats = it },
-                    label = { Text("Цель по приседаниям") },
-                    singleLine = true,
-                    shape = RoundedCornerShape(16.dp)
-                )
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.verticalScroll(rememberScrollState())) {
+                Text("Тема оформления", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    FilterChip(selected = darkThemeMode == 0, onClick = { onThemeChange(0) }, label = { Text("Системная") })
+                    FilterChip(selected = darkThemeMode == 1, onClick = { onThemeChange(1) }, label = { Text("Светлая") })
+                    FilterChip(selected = darkThemeMode == 2, onClick = { onThemeChange(2) }, label = { Text("Темная") })
+                }
+                Divider()
+                OutlinedTextField(value = steps, onValueChange = { steps = it }, label = { Text("Цель по шагам") }, singleLine = true, shape = RoundedCornerShape(16.dp))
+                OutlinedTextField(value = distance, onValueChange = { distance = it }, label = { Text("Цель по дистанции (км)") }, singleLine = true, shape = RoundedCornerShape(16.dp))
+                OutlinedTextField(value = pushUps, onValueChange = { pushUps = it }, label = { Text("Цель по отжиманиям") }, singleLine = true, shape = RoundedCornerShape(16.dp))
+                OutlinedTextField(value = squats, onValueChange = { squats = it }, label = { Text("Цель по приседаниям") }, singleLine = true, shape = RoundedCornerShape(16.dp))
 
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Button(
-                    onClick = onBackupClick,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp)
-                ) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Button(onClick = onBackupClick, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
                     Icon(imageVector = Icons.Rounded.CloudUpload, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Создать бэкап сейчас")
+                    Text("Создать бэкап")
+                }
+                OutlinedButton(onClick = onRestoreClick, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
+                    Icon(imageVector = Icons.Rounded.CloudDownload, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Восстановить из файла")
                 }
             }
         },
         confirmButton = {
             TextButton(onClick = {
-                val pU = pushUps.toIntOrNull() ?: currentPushUpsGoal
-                val sQ = squats.toIntOrNull() ?: currentSquatsGoal
-                val sG = steps.toIntOrNull() ?: currentStepsGoal
-                val dG = distance.toFloatOrNull() ?: currentDistanceGoal
-                onSave(pU, sQ, sG, dG)
-            }) {
-                Text("Сохранить")
-            }
+                onSave(pushUps.toIntOrNull() ?: currentPushUpsGoal, squats.toIntOrNull() ?: currentSquatsGoal, steps.toIntOrNull() ?: currentStepsGoal, distance.toFloatOrNull() ?: currentDistanceGoal)
+            }) { Text("Сохранить") }
         },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Отмена") }
-        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } },
         shape = RoundedCornerShape(28.dp)
     )
 }
 
 @Composable
 fun MetricCard(
-    title: String,
-    value: String,
-    unit: String,
-    progress: Float,
-    icon: ImageVector,
-    containerColor: Color,
-    contentColor: Color,
-    onActionClick: (() -> Unit)? = null,
-    onEditClick: (() -> Unit)? = null,
-    onDeleteClick: (() -> Unit)? = null
+    title: String, value: String, unit: String, progress: Float, icon: ImageVector,
+    containerColor: Color, contentColor: Color,
+    onActionClick: (() -> Unit)? = null, onEditClick: (() -> Unit)? = null, onDeleteClick: (() -> Unit)? = null
 ) {
     Card(
-        shape = RoundedCornerShape(28.dp),
-        colors = CardDefaults.cardColors(containerColor = containerColor),
+        shape = RoundedCornerShape(28.dp), colors = CardDefaults.cardColors(containerColor = containerColor),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .let { if (onEditClick != null) it.clickable(onClick = onEditClick) else it }
+        modifier = Modifier.fillMaxWidth().let { if (onEditClick != null) it.clickable(onClick = onEditClick) else it }
     ) {
-        Column(
-            modifier = Modifier.padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = null,
-                        tint = contentColor,
-                        modifier = Modifier.size(28.dp)
-                    )
-                    Text(
-                        text = title,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = contentColor,
-                        fontWeight = FontWeight.Bold
-                    )
+        Column(modifier = Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Icon(imageVector = icon, contentDescription = null, tint = contentColor, modifier = Modifier.size(28.dp))
+                    Text(text = title, style = MaterialTheme.typography.titleMedium, color = contentColor, fontWeight = FontWeight.Bold)
                 }
-
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (onDeleteClick != null) {
-                        FilledIconButton(
-                            onClick = onDeleteClick,
-                            shape = RoundedCornerShape(16.dp),
-                            colors = IconButtonDefaults.filledIconButtonColors(
-                                containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.8f)
-                            )
-                        ) {
-                            Icon(
-                                imageVector = Icons.Rounded.Delete,
-                                contentDescription = "Удалить",
-                                tint = MaterialTheme.colorScheme.onErrorContainer
-                            )
+                        FilledIconButton(onClick = onDeleteClick, shape = RoundedCornerShape(16.dp), colors = IconButtonDefaults.filledIconButtonColors(containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.8f))) {
+                            Icon(imageVector = Icons.Rounded.Delete, contentDescription = "Удалить", tint = MaterialTheme.colorScheme.onErrorContainer)
                         }
                     }
-
                     if (onEditClick != null) {
-                        FilledIconButton(
-                            onClick = onEditClick,
-                            shape = RoundedCornerShape(16.dp),
-                            colors = IconButtonDefaults.filledIconButtonColors(
-                                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.6f)
-                            )
-                        ) {
-                            Icon(
-                                imageVector = Icons.Rounded.Edit,
-                                contentDescription = "Править",
-                                tint = MaterialTheme.colorScheme.onSurface
-                            )
+                        FilledIconButton(onClick = onEditClick, shape = RoundedCornerShape(16.dp), colors = IconButtonDefaults.filledIconButtonColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.6f))) {
+                            Icon(imageVector = Icons.Rounded.Edit, contentDescription = "Править", tint = MaterialTheme.colorScheme.onSurface)
                         }
                     }
-
                     if (onActionClick != null) {
-                        FilledIconButton(
-                            onClick = onActionClick,
-                            shape = RoundedCornerShape(16.dp),
-                            colors = IconButtonDefaults.filledIconButtonColors(
-                                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.6f)
-                            )
-                        ) {
-                            Icon(
-                                imageVector = Icons.Rounded.Add,
-                                contentDescription = "Добавить",
-                                tint = MaterialTheme.colorScheme.onSurface
-                            )
+                        FilledIconButton(onClick = onActionClick, shape = RoundedCornerShape(16.dp), colors = IconButtonDefaults.filledIconButtonColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.6f))) {
+                            Icon(imageVector = Icons.Rounded.Add, contentDescription = "Добавить", tint = MaterialTheme.colorScheme.onSurface)
                         }
                     }
                 }
             }
-
-            Row(
-                verticalAlignment = Alignment.Bottom,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Text(
-                    text = value,
-                    style = MaterialTheme.typography.displayMedium,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = contentColor
-                )
-                Text(
-                    text = unit,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = contentColor.copy(alpha = 0.8f),
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
+            Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(text = value, style = MaterialTheme.typography.displayMedium, fontWeight = FontWeight.ExtraBold, color = contentColor)
+                Text(text = unit, style = MaterialTheme.typography.bodyLarge, color = contentColor.copy(alpha = 0.8f), modifier = Modifier.padding(bottom = 8.dp))
             }
-
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(16.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(contentColor.copy(alpha = 0.15f))
-            ) {
-                LinearProgressIndicator(
-                    progress = { progress.coerceIn(0f, 1f) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(16.dp)
-                        .clip(RoundedCornerShape(8.dp)),
-                    color = contentColor,
-                    trackColor = Color.Transparent,
-                )
-            }
+            LinearProgressIndicator(progress = { progress.coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth().height(16.dp).clip(RoundedCornerShape(8.dp)), color = contentColor, trackColor = contentColor.copy(alpha = 0.15f))
         }
     }
 }
