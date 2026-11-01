@@ -15,7 +15,8 @@ import java.time.LocalDate
 
 class TrackerViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val dao = AppDatabase.getDatabase(application).trackerDao()
+    private val db = AppDatabase.getDatabase(application)
+    private val dao = db.trackerDao()
     private val currentDate = LocalDate.now().toString()
 
     private val todayTrackerFlow: StateFlow<DailyTracker?> = dao.getTrackerByDate(currentDate)
@@ -54,7 +55,6 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
     val todayCustomProgress: StateFlow<List<ActivityProgressEntity>> = dao.getProgressForDate(currentDate)
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
-    // Поток для заметок
     val notes: StateFlow<List<NoteEntity>> = dao.getAllNotes()
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
@@ -173,14 +173,9 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    // Методы управления заметками
     fun addNote(title: String, content: String, colorHex: String = "#FFB7B2") {
         viewModelScope.launch(Dispatchers.IO) {
-            val note = NoteEntity(
-                title = title,
-                content = content,
-                colorHex = colorHex
-            )
+            val note = NoteEntity(title = title, content = content, colorHex = colorHex)
             dao.insertNote(note)
         }
     }
