@@ -16,7 +16,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -39,6 +39,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.work.*
 import com.example.pixeltracker.data.AppDatabase
 import com.example.pixeltracker.data.BackupWorker
+import com.example.pixeltracker.data.DailyTracker
 import com.example.pixeltracker.data.ReminderWorker
 import com.example.pixeltracker.ui.AchievementsScreen
 import com.example.pixeltracker.ui.NotesScreen
@@ -101,7 +102,6 @@ class MainActivity : ComponentActivity() {
         }
         requestPermissionLauncher.launch(permissions.toTypedArray())
 
-        // Фоновый бэкап раз в сутки
         val backupRequest = PeriodicWorkRequestBuilder<BackupWorker>(24, TimeUnit.HOURS)
             .setConstraints(Constraints.Builder().setRequiresDeviceIdle(true).build())
             .build()
@@ -109,14 +109,13 @@ class MainActivity : ComponentActivity() {
             "MyTrackerDailyBackup", ExistingPeriodicWorkPolicy.KEEP, backupRequest
         )
 
-        // Вечернее напоминание в 20:00
         val reminderRequest = PeriodicWorkRequestBuilder<ReminderWorker>(24, TimeUnit.HOURS).build()
         WorkManager.getInstance(applicationContext).enqueueUniquePeriodicWork(
             "MyTrackerReminder", ExistingPeriodicWorkPolicy.KEEP, reminderRequest
         )
 
         setContent {
-            var darkThemeMode by remember { mutableStateOf(2) } // 0: Системная, 1: Светлая, 2: Темная
+            var darkThemeMode by remember { mutableStateOf(2) }
             val useDarkTheme = when (darkThemeMode) {
                 1 -> false
                 2 -> true
@@ -418,7 +417,7 @@ fun MainTrackerApp(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HistoryScreen(historyList: List<com.example.pixeltracker.data.DailyTracker>, onBackClick: () -> Unit) {
+fun HistoryScreen(historyList: List<DailyTracker>, onBackClick: () -> Unit) {
     val currentYearMonth = remember { YearMonth.now() }
     val daysInMonth = remember { currentYearMonth.lengthOfMonth() }
     val firstDayOfWeek = remember { currentYearMonth.atDay(1).dayOfWeek.value }
@@ -571,7 +570,11 @@ fun GoalsSettingsDialog(
         },
         confirmButton = {
             TextButton(onClick = {
-                onSave(pushUps.toIntOrNull() ?: currentPushUpsGoal, squats.toIntOrNull() ?: currentSquatsGoal, steps.toIntOrNull() ?: currentStepsGoal, distance.toFloatOrNull() ?: currentDistanceGoal)
+                val pU = pushUps.toIntOrNull() ?: currentPushUpsGoal
+                val sQ = squats.toIntOrNull() ?: currentSquatsGoal
+                val sG = steps.toIntOrNull() ?: currentStepsGoal
+                val dG = distance.toFloatOrNull() ?: currentDistanceGoal
+                onSave(pU, sQ, sG, dG)
             }) { Text("Сохранить") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } },
