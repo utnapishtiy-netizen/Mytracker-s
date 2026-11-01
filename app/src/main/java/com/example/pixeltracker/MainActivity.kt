@@ -55,7 +55,6 @@ class MainActivity : ComponentActivity() {
         requestPermissionLauncher.launch(permissions.toTypedArray())
 
         setContent {
-            // Применяем системную тему с поддержкой Material You (динамические цвета)
             PixelTrackerTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
@@ -87,6 +86,7 @@ fun MainTrackerApp(viewModel: TrackerViewModel = viewModel()) {
     var showSettingsDialog by remember { mutableStateOf(false) }
     var showAddActivityDialog by remember { mutableStateOf(false) }
     var editingMetric by remember { mutableStateOf<EditMetricType?>(null) }
+    var activityToDelete by remember { mutableStateOf<com.example.pixeltracker.data.CustomActivityEntity?>(null) }
 
     val steps by viewModel.todaySteps.collectAsState()
     val distance by viewModel.todayDistanceKm.collectAsState()
@@ -222,7 +222,8 @@ fun MainTrackerApp(viewModel: TrackerViewModel = viewModel()) {
                             containerColor = MaterialTheme.colorScheme.secondaryContainer,
                             contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
                             onActionClick = { viewModel.addCustomProgress(activity.id, 5, goalCount) },
-                            onEditClick = { editingMetric = EditMetricType.Custom(activity.id, activity.name, currentCount, goalCount) }
+                            onEditClick = { editingMetric = EditMetricType.Custom(activity.id, activity.name, currentCount, goalCount) },
+                            onDeleteClick = { activityToDelete = activity }
                         )
                     }
                     
@@ -230,6 +231,26 @@ fun MainTrackerApp(viewModel: TrackerViewModel = viewModel()) {
                 }
             }
         }
+    }
+
+    activityToDelete?.let { activity ->
+        AlertDialog(
+            onDismissRequest = { activityToDelete = null },
+            title = { Text("Удалить активность?") },
+            text = { Text("Вы действительно хотите удалить «${activity.name}»?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.deleteCustomActivity(activity.id)
+                    activityToDelete = null
+                }) {
+                    Text("Удалить", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { activityToDelete = null }) { Text("Отмена") }
+            },
+            shape = RoundedCornerShape(28.dp)
+        )
     }
 
     editingMetric?.let { metric ->
@@ -306,7 +327,6 @@ fun MainTrackerApp(viewModel: TrackerViewModel = viewModel()) {
     }
 }
 
-// ЭКРАН ИСТОРИИ И КАЛЕНДАРЯ
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HistoryScreen(
@@ -618,7 +638,8 @@ fun MetricCard(
     containerColor: Color,
     contentColor: Color,
     onActionClick: (() -> Unit)? = null,
-    onEditClick: (() -> Unit)? = null
+    onEditClick: (() -> Unit)? = null,
+    onDeleteClick: (() -> Unit)? = null
 ) {
     Card(
         shape = RoundedCornerShape(28.dp),
@@ -656,6 +677,22 @@ fun MetricCard(
                 }
 
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (onDeleteClick != null) {
+                        FilledIconButton(
+                            onClick = onDeleteClick,
+                            shape = RoundedCornerShape(16.dp),
+                            colors = IconButtonDefaults.filledIconButtonColors(
+                                containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.8f)
+                            )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Delete,
+                                contentDescription = "Удалить",
+                                tint = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        }
+                    }
+
                     if (onEditClick != null) {
                         FilledIconButton(
                             onClick = onEditClick,
