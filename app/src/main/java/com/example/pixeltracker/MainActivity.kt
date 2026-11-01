@@ -33,6 +33,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.pixeltracker.ui.NotesScreen
+import com.example.pixeltracker.ui.StatsScreen
 import com.example.pixeltracker.ui.TrackerViewModel
 import com.example.pixeltracker.ui.theme.PixelTrackerTheme
 import java.time.YearMonth
@@ -71,6 +72,7 @@ sealed class Screen {
     object Tracker : Screen()
     object Notes : Screen()
     object History : Screen()
+    object Stats : Screen() // Экран статистики
 }
 
 sealed class EditMetricType {
@@ -116,6 +118,12 @@ fun MainTrackerApp(viewModel: TrackerViewModel = viewModel()) {
                 onBackClick = { currentScreen = Screen.Tracker }
             )
         }
+        is Screen.Stats -> {
+            StatsScreen(
+                historyList = historyList,
+                onBackClick = { currentScreen = Screen.Tracker }
+            )
+        }
         is Screen.Tracker -> {
             Scaffold(
                 topBar = {
@@ -133,6 +141,10 @@ fun MainTrackerApp(viewModel: TrackerViewModel = viewModel()) {
                         actions = {
                             IconButton(onClick = { viewModel.refreshData() }) {
                                 Icon(imageVector = Icons.Rounded.Refresh, contentDescription = "Обновить")
+                            }
+                            // Кнопка перехода к статистике
+                            IconButton(onClick = { currentScreen = Screen.Stats }) {
+                                Icon(imageVector = Icons.Rounded.BarChart, contentDescription = "Статистика")
                             }
                             IconButton(onClick = { currentScreen = Screen.History }) {
                                 Icon(imageVector = Icons.Rounded.CalendarMonth, contentDescription = "Календарь истории")
