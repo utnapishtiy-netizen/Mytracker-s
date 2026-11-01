@@ -54,7 +54,7 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
     val todayCustomProgress: StateFlow<List<ActivityProgressEntity>> = dao.getProgressForDate(currentDate)
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
-    // Заметки
+    // Поток для заметок
     val notes: StateFlow<List<NoteEntity>> = dao.getAllNotes()
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
@@ -126,7 +126,6 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    // Кастомные активности (с параметром iconType по умолчанию)
     fun addCustomActivity(name: String, unit: String, defaultGoal: Int, iconType: String = "star") {
         viewModelScope.launch(Dispatchers.IO) {
             val activity = CustomActivityEntity(
@@ -175,13 +174,12 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
     }
 
     // Методы управления заметками
-    fun addNote(title: String, content: String, colorHex: String = "#FFFFFF", reminderTime: Long? = null) {
+    fun addNote(title: String, content: String, colorHex: String = "#FFB7B2") {
         viewModelScope.launch(Dispatchers.IO) {
             val note = NoteEntity(
                 title = title,
                 content = content,
-                colorHex = colorHex,
-                reminderTime = reminderTime
+                colorHex = colorHex
             )
             dao.insertNote(note)
         }
