@@ -257,6 +257,11 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    // Алиас для совместимости с MainActivity
+    fun addCustomProgress(activityId: Long, delta: Int, goal: Int) {
+        addCustomActivityProgress(activityId, delta, goal)
+    }
+
     fun updateCustomProgress(activityId: Long, newCount: Int, goal: Int) {
         viewModelScope.launch(Dispatchers.IO) {
             checkAndUpdateDate()
