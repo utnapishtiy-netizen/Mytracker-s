@@ -1,6 +1,11 @@
 package com.example.pixeltracker.ui
 
 import android.app.Application
+import android.content.Context
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.pixeltracker.data.AppDatabase
@@ -13,15 +18,18 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
-class TrackerViewModel(application: Application) : AndroidViewModel(application) {
+class TrackerViewModel(application: Application) : AndroidViewModel(application), SensorEventListener {
 
     private val db = AppDatabase.getDatabase(application)
     private val dao = db.trackerDao()
 
+    private val sensorManager = application.getSystemService(Context.SENSOR_SERVICE) as SensorManager
+    private val stepSensor = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_COUNTER)
+    private var initialStepCount = -1f
+
     private val _currentDate = MutableStateFlow(LocalDate.now().toString())
     val currentDate: StateFlow<String> = _currentDate.asStateFlow()
 
-    // Динамический поток текущего дня, обновляющийся при смене даты
     private val todayTrackerFlow: StateFlow<DailyTracker?> = _currentDate.flatMapLatest { date ->
         dao.getTrackerByDate(date)
     }.stateIn(viewModelScope, SharingStarted.Lazily, null)
@@ -56,7 +64,6 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
     val customActivities: StateFlow<List<CustomActivityEntity>> = dao.getAllCustomActivities()
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
-    // Прогресс кастомных активностей привязан к актуальной дате
     val todayCustomProgress: StateFlow<List<ActivityProgressEntity>> = _currentDate.flatMapLatest { date ->
         dao.getProgressForDate(date)
     }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
@@ -70,7 +77,34 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
 
     init {
         checkAndUpdateDate()
+        registerStepSensor()
     }
+
+    private fun registerStepSensor() {
+        stepSensor?.let {
+            sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_UI)
+        }
+    }
+
+    override fun onSensorChanged(event: SensorEvent?) {
+        if (event?.sensor?.type == Sensor.TYPE_STEP_COUNTER) {
+            val totalStepsFromDevice = event.values[0]
+            if (initialStepCount < 0f) {
+                initialStepCount = totalStepsFromDevice
+            }
+            val sessionSteps = (totalStepsFromDevice - initialStepCount).toInt()
+            if (sessionSteps > 0) {
+                // Автоматически обновляем шаги и примерную дистанцию (1 шаг ≈ 0.00075 км)
+                val currentStoredSteps = todaySteps.value
+                if (sessionSteps > currentStoredSteps) {
+                    val delta = sessionSteps - currentStoredSteps
+                    addSteps(delta)
+                }
+            }
+        }
+    }
+
+    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
 
     fun refreshData() {
         checkAndUpdateDate()
@@ -80,6 +114,7 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
         val todayStr = LocalDate.now().toString()
         if (_currentDate.value != todayStr) {
             _currentDate.value = todayStr
+            initialStepCount = -1f // сброс дельты датчика на новый день
         }
         viewModelScope.launch(Dispatchers.IO) {
             val existing = dao.getTrackerByDateSync(todayStr)
@@ -101,19 +136,23 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    // Методы управления шагами и дистанцией
     fun addSteps(amount: Int) {
         viewModelScope.launch(Dispatchers.IO) {
             checkAndUpdateDate()
             val current = todaySteps.value
-            dao.updateSteps(_currentDate.value, current + amount)
+            val newSteps = current + amount
+            val newDistance = newSteps * 0.00075f // автоматический пересчет в км
+            dao.updateSteps(_currentDate.value, newSteps)
+            dao.updateDistance(_currentDate.value, newDistance)
         }
     }
 
     fun setSteps(count: Int) {
         viewModelScope.launch(Dispatchers.IO) {
             checkAndUpdateDate()
+            val newDistance = count * 0.00075f
             dao.updateSteps(_currentDate.value, count.coerceAtLeast(0))
+            dao.updateDistance(_currentDate.value, newDistance.coerceAtLeast(0f))
         }
     }
 
@@ -132,7 +171,6 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    // Методы для упражнений
     fun addPushUps(amount: Int) {
         viewModelScope.launch(Dispatchers.IO) {
             checkAndUpdateDate()
@@ -242,6 +280,15 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
     fun deleteNote(note: NoteEntity) {
         viewModelScope.launch(Dispatchers.IO) {
             dao.deleteNote(note)
+        }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        try {
+            sensorManager.unregisterListener(this)
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 
