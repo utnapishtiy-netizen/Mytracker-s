@@ -1,6 +1,7 @@
 package com.example.pixeltracker.ui.theme
 
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
@@ -63,7 +64,7 @@ fun PixelTrackerTheme(
 
     MaterialTheme(
         colorScheme = colorScheme,
-        typography = com.example.pixeltracker.ui.theme.Typography,
+        typography = Typography(),
         content = content
     )
 }
