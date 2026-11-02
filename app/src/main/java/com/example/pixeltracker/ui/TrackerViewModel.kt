@@ -90,14 +90,23 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
         if (event?.sensor?.type == Sensor.TYPE_STEP_COUNTER) {
             val totalStepsFromDevice = event.values[0]
             if (initialStepCount < 0f) {
+                // Если датчик отсчитывает общие шаги с момента перезагрузки устройства,
+                // фиксируем базовое значение, чтобы считать шаги сессии/дня.
                 initialStepCount = totalStepsFromDevice
             }
             val sessionSteps = (totalStepsFromDevice - initialStepCount).toInt()
-            if (sessionSteps > 0) {
-                val currentStoredSteps = todaySteps.value
-                if (sessionSteps > currentStoredSteps) {
-                    val delta = sessionSteps - currentStoredSteps
-                    addSteps(delta)
+            if (sessionSteps >= 0) {
+                viewModelScope.launch(Dispatchers.IO) {
+                    checkAndUpdateDate()
+                    val existingTracker = dao.getTrackerByDateSync(_currentDate.value)
+                    val baseStoredSteps = existingTracker?.stepsCount ?: 0
+                    
+                    // Если системный шагомер выдал больше, чем записано, обновляем
+                    if (sessionSteps > baseStoredSteps) {
+                        val newDistance = sessionSteps * 0.00075f
+                        dao.updateSteps(_currentDate.value, sessionSteps)
+                        dao.updateDistance(_currentDate.value, newDistance)
+                    }
                 }
             }
         }
@@ -115,7 +124,7 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
             _currentDate.value = todayStr
             initialStepCount = -1f
         }
-        viewModelScope.launch(Dispatchers.IO) {
+        runBlocking(Dispatchers.IO) {
             val existing = dao.getTrackerByDateSync(todayStr)
             if (existing == null) {
                 val lastTracker = dao.getAllTrackers().firstOrNull()?.firstOrNull()
@@ -233,7 +242,7 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    fun addCustomProgress(activityId: Long, delta: Int, goal: Int) {
+    fun addCustomActivityProgress(activityId: Long, delta: Int, goal: Int) {
         viewModelScope.launch(Dispatchers.IO) {
             checkAndUpdateDate()
             val existingList = dao.getProgressForDate(_currentDate.value).firstOrNull() ?: emptyList()
@@ -292,7 +301,7 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
     }
 
     private fun calculateStreak(history: List<DailyTracker>): Int {
-        if (history.isEmpty()) return 0
+        if, history.isEmpty() -> return 0
         var streak = 0
         var expectedDate = LocalDate.now()
 
