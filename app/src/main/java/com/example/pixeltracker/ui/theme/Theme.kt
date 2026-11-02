@@ -63,7 +63,7 @@ fun PixelTrackerTheme(
 
     MaterialTheme(
         colorScheme = colorScheme,
-        typography = Typography,
+        typography = com.example.pixeltracker.ui.theme.Typography,
         content = content
     )
 }
