@@ -43,8 +43,8 @@ class TrackerWidget : GlanceAppWidget() {
                     contentAlignment = Alignment.Center
                 ) {
                     Column(
-                        verticalAlignment = Alignment.Vertical.Center,
-                        horizontalAlignment = Alignment.Horizontal.Center
+                        verticalAlignment = Alignment.Vertical.CenterVertically,
+                        horizontalAlignment = Alignment.Horizontal.CenterHorizontally
                     ) {
                         Text(
                             text = "🔥 Стрик: $streak дн.",
@@ -58,7 +58,7 @@ class TrackerWidget : GlanceAppWidget() {
                         Text(
                             text = "👣 $steps / $stepsGoal",
                             style = TextStyle(
-                                color = TextStyle(color = GlanceTheme.colors.onSurfaceVariant).color,
+                                color = GlanceTheme.colors.onSurfaceVariant,
                                 fontSize = 18.sp,
                                 fontWeight = FontWeight.Bold
                             )
