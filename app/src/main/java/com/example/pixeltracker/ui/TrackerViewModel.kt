@@ -17,10 +17,14 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
 
     private val db = AppDatabase.getDatabase(application)
     private val dao = db.trackerDao()
-    private val currentDate = LocalDate.now().toString()
 
-    private val todayTrackerFlow: StateFlow<DailyTracker?> = dao.getTrackerByDate(currentDate)
-        .stateIn(viewModelScope, SharingStarted.Lazily, null)
+    private val _currentDate = MutableStateFlow(LocalDate.now().toString())
+    val currentDate: StateFlow<String> = _currentDate.asStateFlow()
+
+    // Динамический поток текущего дня, обновляющийся при смене даты
+    private val todayTrackerFlow: StateFlow<DailyTracker?> = _currentDate.flatMapLatest { date ->
+        dao.getTrackerByDate(date)
+    }.stateIn(viewModelScope, SharingStarted.Lazily, null)
 
     val todaySteps: StateFlow<Int> = todayTrackerFlow.map { it?.stepsCount ?: 0 }
         .stateIn(viewModelScope, SharingStarted.Lazily, 0)
@@ -52,8 +56,10 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
     val customActivities: StateFlow<List<CustomActivityEntity>> = dao.getAllCustomActivities()
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
-    val todayCustomProgress: StateFlow<List<ActivityProgressEntity>> = dao.getProgressForDate(currentDate)
-        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+    // Прогресс кастомных активностей привязан к актуальной дате
+    val todayCustomProgress: StateFlow<List<ActivityProgressEntity>> = _currentDate.flatMapLatest { date ->
+        dao.getProgressForDate(date)
+    }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
     val notes: StateFlow<List<NoteEntity>> = dao.getAllNotes()
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
@@ -63,16 +69,24 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
     }.stateIn(viewModelScope, SharingStarted.Lazily, 0)
 
     init {
-        ensureTodayRecordExists()
+        checkAndUpdateDate()
     }
 
-    private fun ensureTodayRecordExists() {
+    fun refreshData() {
+        checkAndUpdateDate()
+    }
+
+    private fun checkAndUpdateDate() {
+        val todayStr = LocalDate.now().toString()
+        if (_currentDate.value != todayStr) {
+            _currentDate.value = todayStr
+        }
         viewModelScope.launch(Dispatchers.IO) {
-            val existing = dao.getTrackerByDateSync(currentDate)
+            val existing = dao.getTrackerByDateSync(todayStr)
             if (existing == null) {
                 val lastTracker = dao.getAllTrackers().firstOrNull()?.firstOrNull()
                 val newTracker = DailyTracker(
-                    date = currentDate,
+                    date = todayStr,
                     stepsCount = 0,
                     stepsGoal = lastTracker?.stepsGoal ?: 10000,
                     distanceKm = 0f,
@@ -87,35 +101,72 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    // Методы управления шагами и дистанцией
+    fun addSteps(amount: Int) {
+        viewModelScope.launch(Dispatchers.IO) {
+            checkAndUpdateDate()
+            val current = todaySteps.value
+            dao.updateSteps(_currentDate.value, current + amount)
+        }
+    }
+
+    fun setSteps(count: Int) {
+        viewModelScope.launch(Dispatchers.IO) {
+            checkAndUpdateDate()
+            dao.updateSteps(_currentDate.value, count.coerceAtLeast(0))
+        }
+    }
+
+    fun addDistance(amountKm: Float) {
+        viewModelScope.launch(Dispatchers.IO) {
+            checkAndUpdateDate()
+            val current = todayDistanceKm.value
+            dao.updateDistance(_currentDate.value, current + amountKm)
+        }
+    }
+
+    fun setDistance(distanceKm: Float) {
+        viewModelScope.launch(Dispatchers.IO) {
+            checkAndUpdateDate()
+            dao.updateDistance(_currentDate.value, distanceKm.coerceAtLeast(0f))
+        }
+    }
+
+    // Методы для упражнений
     fun addPushUps(amount: Int) {
         viewModelScope.launch(Dispatchers.IO) {
+            checkAndUpdateDate()
             val current = todayPushUps.value
-            dao.updatePushUps(currentDate, current + amount)
+            dao.updatePushUps(_currentDate.value, current + amount)
         }
     }
 
     fun setPushUps(count: Int) {
         viewModelScope.launch(Dispatchers.IO) {
-            dao.updatePushUps(currentDate, count.coerceAtLeast(0))
+            checkAndUpdateDate()
+            dao.updatePushUps(_currentDate.value, count.coerceAtLeast(0))
         }
     }
 
     fun addSquats(amount: Int) {
         viewModelScope.launch(Dispatchers.IO) {
+            checkAndUpdateDate()
             val current = todaySquats.value
-            dao.updateSquats(currentDate, current + amount)
+            dao.updateSquats(_currentDate.value, current + amount)
         }
     }
 
     fun setSquats(count: Int) {
         viewModelScope.launch(Dispatchers.IO) {
-            dao.updateSquats(currentDate, count.coerceAtLeast(0))
+            checkAndUpdateDate()
+            dao.updateSquats(_currentDate.value, count.coerceAtLeast(0))
         }
     }
 
     fun updateGoals(pushUps: Int, squats: Int, steps: Int, distance: Float) {
         viewModelScope.launch(Dispatchers.IO) {
-            val current = dao.getTrackerByDateSync(currentDate) ?: DailyTracker(date = currentDate)
+            checkAndUpdateDate()
+            val current = dao.getTrackerByDateSync(_currentDate.value) ?: DailyTracker(date = _currentDate.value)
             val updated = current.copy(
                 pushUpsGoal = pushUps,
                 squatsGoal = squats,
@@ -147,13 +198,14 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
 
     fun addCustomProgress(activityId: Long, delta: Int, goal: Int) {
         viewModelScope.launch(Dispatchers.IO) {
-            val existingList = dao.getProgressForDate(currentDate).firstOrNull() ?: emptyList()
+            checkAndUpdateDate()
+            val existingList = dao.getProgressForDate(_currentDate.value).firstOrNull() ?: emptyList()
             val currentItem = existingList.find { it.activityId == activityId }
             val newCount = (currentItem?.currentCount ?: 0) + delta
 
             val progressEntity = ActivityProgressEntity(
                 activityId = activityId,
-                date = currentDate,
+                date = _currentDate.value,
                 currentCount = newCount.coerceAtLeast(0),
                 goalCount = goal
             )
@@ -163,9 +215,10 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
 
     fun updateCustomProgress(activityId: Long, newCount: Int, goal: Int) {
         viewModelScope.launch(Dispatchers.IO) {
+            checkAndUpdateDate()
             val progressEntity = ActivityProgressEntity(
                 activityId = activityId,
-                date = currentDate,
+                date = _currentDate.value,
                 currentCount = newCount.coerceAtLeast(0),
                 goalCount = goal
             )
@@ -190,10 +243,6 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch(Dispatchers.IO) {
             dao.deleteNote(note)
         }
-    }
-
-    fun refreshData() {
-        ensureTodayRecordExists()
     }
 
     private fun calculateStreak(history: List<DailyTracker>): Int {
