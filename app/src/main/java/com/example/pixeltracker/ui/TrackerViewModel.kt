@@ -94,7 +94,6 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
             }
             val sessionSteps = (totalStepsFromDevice - initialStepCount).toInt()
             if (sessionSteps > 0) {
-                // Автоматически обновляем шаги и примерную дистанцию (1 шаг ≈ 0.00075 км)
                 val currentStoredSteps = todaySteps.value
                 if (sessionSteps > currentStoredSteps) {
                     val delta = sessionSteps - currentStoredSteps
@@ -114,7 +113,7 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
         val todayStr = LocalDate.now().toString()
         if (_currentDate.value != todayStr) {
             _currentDate.value = todayStr
-            initialStepCount = -1f // сброс дельты датчика на новый день
+            initialStepCount = -1f
         }
         viewModelScope.launch(Dispatchers.IO) {
             val existing = dao.getTrackerByDateSync(todayStr)
@@ -141,7 +140,7 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
             checkAndUpdateDate()
             val current = todaySteps.value
             val newSteps = current + amount
-            val newDistance = newSteps * 0.00075f // автоматический пересчет в км
+            val newDistance = newSteps * 0.00075f
             dao.updateSteps(_currentDate.value, newSteps)
             dao.updateDistance(_currentDate.value, newDistance)
         }
