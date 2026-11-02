@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.PixelTracker" parent="Theme.Material3.DayNight.NoActionBar">
+        <!-- Настройки темы по умолчанию для Material 3 -->
+    </style>
+</resources>
