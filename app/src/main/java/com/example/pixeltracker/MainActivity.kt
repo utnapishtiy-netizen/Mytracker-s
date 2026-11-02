@@ -2,9 +2,13 @@ package com.example.pixeltracker
 
 import android.Manifest
 import android.app.Activity
+import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -58,6 +62,26 @@ import java.time.YearMonth
 import java.util.Date
 import java.util.Locale
 import java.util.concurrent.TimeUnit
+
+fun triggerHapticFeedback(context: Context) {
+    try {
+        val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val vibratorManager = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
+            vibratorManager.defaultVibrator
+        } else {
+            @Suppress("DEPRECATION")
+            context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            vibrator.vibrate(VibrationEffect.createOneShot(40, VibrationEffect.DEFAULT_AMPLITUDE))
+        } else {
+            @Suppress("DEPRECATION")
+            vibrator.vibrate(40)
+        }
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
+}
 
 class MainActivity : ComponentActivity() {
 
@@ -162,6 +186,7 @@ fun MainTrackerApp(
     onThemeChange: (Int) -> Unit,
     onImportClick: () -> Unit
 ) {
+    val context = LocalContext.current
     var currentScreen by remember { mutableStateOf<Screen>(Screen.Tracker) }
     var showSettingsDialog by remember { mutableStateOf(false) }
     var showAddActivityDialog by remember { mutableStateOf(false) }
@@ -213,22 +238,22 @@ fun MainTrackerApp(
                             )
                         },
                         actions = {
-                            IconButton(onClick = { viewModel.refreshData() }) {
+                            IconButton(onClick = { triggerHapticFeedback(context); viewModel.refreshData() }) {
                                 Icon(imageVector = Icons.Rounded.Refresh, contentDescription = "Обновить")
                             }
-                            IconButton(onClick = { currentScreen = Screen.Achievements }) {
+                            IconButton(onClick = { triggerHapticFeedback(context); currentScreen = Screen.Achievements }) {
                                 Icon(imageVector = Icons.Rounded.EmojiEvents, contentDescription = "Достижения")
                             }
-                            IconButton(onClick = { currentScreen = Screen.Stats }) {
+                            IconButton(onClick = { triggerHapticFeedback(context); currentScreen = Screen.Stats }) {
                                 Icon(imageVector = Icons.Rounded.BarChart, contentDescription = "Статистика")
                             }
-                            IconButton(onClick = { currentScreen = Screen.History }) {
+                            IconButton(onClick = { triggerHapticFeedback(context); currentScreen = Screen.History }) {
                                 Icon(imageVector = Icons.Rounded.CalendarMonth, contentDescription = "Календарь")
                             }
-                            IconButton(onClick = { currentScreen = Screen.Notes }) {
+                            IconButton(onClick = { triggerHapticFeedback(context); currentScreen = Screen.Notes }) {
                                 Icon(imageVector = Icons.Rounded.Note, contentDescription = "Заметки")
                             }
-                            IconButton(onClick = { showSettingsDialog = true }) {
+                            IconButton(onClick = { triggerHapticFeedback(context); showSettingsDialog = true }) {
                                 Icon(imageVector = Icons.Rounded.Settings, contentDescription = "Настройки")
                             }
                         }
@@ -236,7 +261,7 @@ fun MainTrackerApp(
                 },
                 floatingActionButton = {
                     FloatingActionButton(
-                        onClick = { showAddActivityDialog = true },
+                        onClick = { triggerHapticFeedback(context); showAddActivityDialog = true },
                         containerColor = MaterialTheme.colorScheme.primaryContainer,
                         contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                     ) {
@@ -258,8 +283,8 @@ fun MainTrackerApp(
                         icon = Icons.Rounded.DirectionsWalk,
                         containerColor = MaterialTheme.colorScheme.primaryContainer,
                         contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                        onActionClick = { viewModel.addSteps(500) },
-                        onEditClick = { editingMetric = EditMetricType.Steps(steps) }
+                        onActionClick = { triggerHapticFeedback(context); viewModel.addSteps(500) },
+                        onEditClick = { triggerHapticFeedback(context); editingMetric = EditMetricType.Steps(steps) }
                     )
 
                     MetricCard(
@@ -268,8 +293,8 @@ fun MainTrackerApp(
                         icon = Icons.Rounded.Map,
                         containerColor = MaterialTheme.colorScheme.secondaryContainer,
                         contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                        onActionClick = { viewModel.addDistance(1.0f) },
-                        onEditClick = { editingMetric = EditMetricType.Distance(distance) }
+                        onActionClick = { triggerHapticFeedback(context); viewModel.addDistance(1.0f) },
+                        onEditClick = { triggerHapticFeedback(context); editingMetric = EditMetricType.Distance(distance) }
                     )
 
                     MetricCard(
@@ -278,8 +303,8 @@ fun MainTrackerApp(
                         icon = Icons.Rounded.FitnessCenter,
                         containerColor = MaterialTheme.colorScheme.tertiaryContainer,
                         contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
-                        onActionClick = { viewModel.addPushUps(10) },
-                        onEditClick = { editingMetric = EditMetricType.PushUps(pushUps) }
+                        onActionClick = { triggerHapticFeedback(context); viewModel.addPushUps(10) },
+                        onEditClick = { triggerHapticFeedback(context); editingMetric = EditMetricType.PushUps(pushUps) }
                     )
 
                     MetricCard(
@@ -288,8 +313,8 @@ fun MainTrackerApp(
                         icon = Icons.Rounded.AccessibilityNew,
                         containerColor = MaterialTheme.colorScheme.surfaceVariant,
                         contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        onActionClick = { viewModel.addSquats(10) },
-                        onEditClick = { editingMetric = EditMetricType.Squats(squats) }
+                        onActionClick = { triggerHapticFeedback(context); viewModel.addSquats(10) },
+                        onEditClick = { triggerHapticFeedback(context); editingMetric = EditMetricType.Squats(squats) }
                     )
 
                     customActivities.forEach { activity ->
@@ -303,9 +328,9 @@ fun MainTrackerApp(
                             icon = Icons.Rounded.Star,
                             containerColor = MaterialTheme.colorScheme.secondaryContainer,
                             contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                            onActionClick = { viewModel.addCustomProgress(activity.id, 5, goalCount) },
-                            onEditClick = { editingMetric = EditMetricType.Custom(activity.id, activity.name, currentCount, goalCount) },
-                            onDeleteClick = { activityToDelete = activity }
+                            onActionClick = { triggerHapticFeedback(context); viewModel.addCustomProgress(activity.id, 5, goalCount) },
+                            onEditClick = { triggerHapticFeedback(context); editingMetric = EditMetricType.Custom(activity.id, activity.name, currentCount, goalCount) },
+                            onDeleteClick = { triggerHapticFeedback(context); activityToDelete = activity }
                         )
                     }
                     Spacer(modifier = Modifier.height(64.dp))
@@ -362,26 +387,11 @@ fun MainTrackerApp(
             confirmButton = {
                 TextButton(onClick = {
                     when (metric) {
-                        is EditMetricType.Steps -> {
-                            val newVal = inputVal.toIntOrNull() ?: 0
-                            viewModel.setSteps(newVal)
-                        }
-                        is EditMetricType.Distance -> {
-                            val newVal = inputVal.toFloatOrNull() ?: 0f
-                            viewModel.setDistance(newVal)
-                        }
-                        is EditMetricType.PushUps -> {
-                            val newVal = inputVal.toIntOrNull() ?: 0
-                            viewModel.setPushUps(newVal)
-                        }
-                        is EditMetricType.Squats -> {
-                            val newVal = inputVal.toIntOrNull() ?: 0
-                            viewModel.setSquats(newVal)
-                        }
-                        is EditMetricType.Custom -> {
-                            val newVal = inputVal.toIntOrNull() ?: 0
-                            viewModel.updateCustomProgress(metric.activityId, newVal, metric.goal)
-                        }
+                        is EditMetricType.Steps -> viewModel.setSteps(inputVal.toIntOrNull() ?: 0)
+                        is EditMetricType.Distance -> viewModel.setDistance(inputVal.toFloatOrNull() ?: 0f)
+                        is EditMetricType.PushUps -> viewModel.setPushUps(inputVal.toIntOrNull() ?: 0)
+                        is EditMetricType.Squats -> viewModel.setSquats(inputVal.toIntOrNull() ?: 0)
+                        is EditMetricType.Custom -> viewModel.updateCustomProgress(metric.activityId, inputVal.toIntOrNull() ?: 0, metric.goal)
                     }
                     editingMetric = null
                 }) { Text("Установить") }
@@ -400,8 +410,6 @@ fun MainTrackerApp(
 
     if (showSettingsDialog) {
         val coroutineScope = rememberCoroutineScope()
-        val currentContext = LocalContext.current
-
         GoalsSettingsDialog(
             currentPushUpsGoal = pushUpsGoal, currentSquatsGoal = squatsGoal,
             currentStepsGoal = stepsGoal, currentDistanceGoal = distanceGoal,
@@ -412,7 +420,7 @@ fun MainTrackerApp(
             onBackupClick = {
                 coroutineScope.launch(Dispatchers.IO) {
                     try {
-                        val db = AppDatabase.getDatabase(currentContext)
+                        val db = AppDatabase.getDatabase(context)
                         val dao = db.trackerDao()
                         val history = dao.getAllTrackers().first()
                         val customActivities = dao.getAllCustomActivities().first()
@@ -429,15 +437,15 @@ fun MainTrackerApp(
                             notes.forEach { appendLine(it.toString()) }
                         }
 
-                        val file = File(currentContext.getExternalFilesDir(null), "MyTracker_Backup_$timestamp.txt")
+                        val file = File(context.getExternalFilesDir(null), "MyTracker_Backup_$timestamp.txt")
                         file.writeText(backupContent)
 
                         withContext(Dispatchers.Main) {
-                            Toast.makeText(currentContext, "Бэкап сохранен в файлы!", Toast.LENGTH_LONG).show()
+                            Toast.makeText(context, "Бэкап сохранен в файлы!", Toast.LENGTH_LONG).show()
                         }
                     } catch (e: Exception) {
                         e.printStackTrace()
-                        withContext(Dispatchers.Main) { Toast.makeText(currentContext, "Ошибка бэкапа", Toast.LENGTH_SHORT).show() }
+                        withContext(Dispatchers.Main) { Toast.makeText(context, "Ошибка бэкапа", Toast.LENGTH_SHORT).show() }
                     }
                 }
             },
