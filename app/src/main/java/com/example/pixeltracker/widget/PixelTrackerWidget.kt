@@ -17,14 +17,12 @@ import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
-import androidx.compose.ui.graphics.Color
 import com.example.pixeltracker.MainActivity
 
 class PixelTrackerWidget : GlanceAppWidget() {
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         provideContent {
-            // Используем прямой стабильный UI-контейнер для Glance
             Box(
                 modifier = GlanceModifier
                     .fillMaxSize()
@@ -47,7 +45,7 @@ class PixelTrackerWidget : GlanceAppWidget() {
                     )
                     Spacer(modifier = GlanceModifier.height(4.dp))
                     Text(
-                        text = "Нажмите для открытия",
+                        text = "Открыть",
                         style = TextStyle(
                             color = ColorProvider(android.graphics.Color.LTGRAY),
                             fontSize = 11.sp
