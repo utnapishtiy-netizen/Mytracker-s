@@ -3,6 +3,5 @@
     android:minWidth="140dp"
     android:minHeight="70dp"
     android:updatePeriodMillis="86400000"
-    android:initialLayout="@android:layout/list_content"
     android:resizeMode="horizontal|vertical"
     android:widgetCategory="home_screen" />
