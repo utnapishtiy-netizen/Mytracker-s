@@ -232,14 +232,7 @@ fun MainTrackerApp(
             Scaffold(
                 topBar = {
                     TopAppBar(
-                        title = {
-                            Text(
-                                "Стрик: $streak дн.",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                fontWeight = FontWeight.Bold
-                            )
-                        },
+                        title = { /* Пустой заголовок, убраны любые названия */ },
                         actions = {
                             IconButton(onClick = { triggerHapticFeedback(context); viewModel.refreshData() }) {
                                 Icon(imageVector = Icons.Rounded.Refresh, contentDescription = "Обновить")
@@ -282,7 +275,6 @@ fun MainTrackerApp(
                         .padding(20.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    // Календарная строка в стиле e-ink
                     Card(
                         shape = RoundedCornerShape(20.dp),
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
