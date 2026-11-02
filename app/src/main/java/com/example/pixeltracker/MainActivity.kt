@@ -14,6 +14,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -39,7 +40,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.work.*
 import com.example.pixeltracker.data.AppDatabase
@@ -234,9 +234,9 @@ fun MainTrackerApp(
                     TopAppBar(
                         title = {
                             Text(
-                                "🔥 Стрик: $streak дн.",
+                                "Стрик: $streak дн.",
                                 style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.primary,
+                                color = MaterialTheme.colorScheme.onSurface,
                                 fontWeight = FontWeight.Bold
                             )
                         },
@@ -265,9 +265,10 @@ fun MainTrackerApp(
                 floatingActionButton = {
                     FloatingActionButton(
                         onClick = { triggerHapticFeedback(context); showAddActivityDialog = true },
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                        shape = RoundedCornerShape(20.dp)
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        contentColor = MaterialTheme.colorScheme.onSurface,
+                        shape = RoundedCornerShape(16.dp),
+                        modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(16.dp))
                     ) {
                         Icon(imageVector = Icons.Rounded.Add, contentDescription = "Добавить")
                     }
@@ -281,20 +282,23 @@ fun MainTrackerApp(
                         .padding(20.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    // Стильная строка дней недели (как на референсе)
+                    // Календарная строка в стиле e-ink
                     Card(
-                        shape = RoundedCornerShape(24.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                        modifier = Modifier.fillMaxWidth()
+                        shape = RoundedCornerShape(20.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .border(1.5.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(20.dp))
                     ) {
                         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             val today = LocalDate.now()
                             val formatter = SimpleDateFormat("EEEE, d MMMM", Locale("ru"))
                             Text(
-                                text = "✨ ${formatter.format(Date()).replaceFirstChar { it.uppercase() }}",
+                                text = formatter.format(Date()).replaceFirstChar { it.uppercase() },
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -309,21 +313,21 @@ fun MainTrackerApp(
                                     Column(
                                         horizontalAlignment = Alignment.CenterHorizontally,
                                         modifier = Modifier
-                                            .clip(RoundedCornerShape(16.dp))
-                                            .background(if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent)
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(if (isSelected) MaterialTheme.colorScheme.onSurface else Color.Transparent)
                                             .padding(horizontal = 8.dp, vertical = 6.dp)
                                     ) {
                                         Text(
                                             text = dayLetter,
                                             style = MaterialTheme.typography.labelMedium,
-                                            color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                                            color = if (isSelected) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                         Spacer(modifier = Modifier.height(4.dp))
                                         Text(
                                             text = "$dayNum",
                                             style = MaterialTheme.typography.bodyMedium,
                                             fontWeight = FontWeight.Bold,
-                                            color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+                                            color = if (isSelected) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.onSurface
                                         )
                                     }
                                 }
@@ -335,8 +339,6 @@ fun MainTrackerApp(
                         title = "Шаги", value = "$steps", unit = "/ $stepsGoal",
                         progress = if (stepsGoal > 0) steps.toFloat() / stepsGoal else 0f,
                         icon = Icons.Rounded.DirectionsWalk,
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                         onActionClick = { triggerHapticFeedback(context); viewModel.addSteps(500) },
                         onEditClick = { triggerHapticFeedback(context); editingMetric = EditMetricType.Steps(steps) }
                     )
@@ -345,8 +347,6 @@ fun MainTrackerApp(
                         title = "Дистанция", value = "%.2f".format(distance), unit = "км / $distanceGoal км",
                         progress = if (distanceGoal > 0f) distance / distanceGoal else 0f,
                         icon = Icons.Rounded.Map,
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                         onActionClick = { triggerHapticFeedback(context); viewModel.addDistance(1.0f) },
                         onEditClick = { triggerHapticFeedback(context); editingMetric = EditMetricType.Distance(distance) }
                     )
@@ -355,8 +355,6 @@ fun MainTrackerApp(
                         title = "Отжимания", value = "$pushUps", unit = "/ $pushUpsGoal",
                         progress = if (pushUpsGoal > 0) pushUps.toFloat() / pushUpsGoal else 0f,
                         icon = Icons.Rounded.FitnessCenter,
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                         onActionClick = { triggerHapticFeedback(context); viewModel.addPushUps(10) },
                         onEditClick = { triggerHapticFeedback(context); editingMetric = EditMetricType.PushUps(pushUps) }
                     )
@@ -365,8 +363,6 @@ fun MainTrackerApp(
                         title = "Приседания", value = "$squats", unit = "/ $squatsGoal",
                         progress = if (squatsGoal > 0) squats.toFloat() / squatsGoal else 0f,
                         icon = Icons.Rounded.AccessibilityNew,
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                         onActionClick = { triggerHapticFeedback(context); viewModel.addSquats(10) },
                         onEditClick = { triggerHapticFeedback(context); editingMetric = EditMetricType.Squats(squats) }
                     )
@@ -380,8 +376,6 @@ fun MainTrackerApp(
                             title = activity.name, value = "$currentCount", unit = "${activity.unit} / $goalCount",
                             progress = if (goalCount > 0) currentCount.toFloat() / goalCount else 0f,
                             icon = Icons.Rounded.Star,
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                             onActionClick = { triggerHapticFeedback(context); viewModel.addCustomProgress(activity.id, 5, goalCount) },
                             onEditClick = { triggerHapticFeedback(context); editingMetric = EditMetricType.Custom(activity.id, activity.name, currentCount, goalCount) },
                             onDeleteClick = { triggerHapticFeedback(context); activityToDelete = activity }
@@ -400,11 +394,11 @@ fun MainTrackerApp(
             text = { Text("Вы действительно хотите удалить «${activity.name}»?") },
             confirmButton = {
                 TextButton(onClick = { viewModel.deleteCustomActivity(activity.id); activityToDelete = null }) {
-                    Text("Удалить", color = MaterialTheme.colorScheme.error)
+                    Text("Удалить", color = MaterialTheme.colorScheme.onSurface)
                 }
             },
             dismissButton = { TextButton(onClick = { activityToDelete = null }) { Text("Отмена") } },
-            shape = RoundedCornerShape(28.dp)
+            shape = RoundedCornerShape(20.dp)
         )
     }
 
@@ -435,7 +429,7 @@ fun MainTrackerApp(
                 OutlinedTextField(
                     value = inputVal, onValueChange = { inputVal = it },
                     label = { Text("Значение") }, singleLine = true,
-                    shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()
+                    shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth()
                 )
             },
             confirmButton = {
@@ -451,7 +445,7 @@ fun MainTrackerApp(
                 }) { Text("Установить") }
             },
             dismissButton = { TextButton(onClick = { editingMetric = null }) { Text("Отмена") } },
-            shape = RoundedCornerShape(28.dp)
+            shape = RoundedCornerShape(20.dp)
         )
     }
 
@@ -538,14 +532,15 @@ fun HistoryScreen(historyList: List<DailyTracker>, onBackClick: () -> Unit) {
         ) {
             item {
                 Card(
-                    shape = RoundedCornerShape(24.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                    modifier = Modifier.fillMaxWidth()
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                    modifier = Modifier.fillMaxWidth().border(1.5.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(20.dp))
                 ) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Text(
-                            text = "📅 ${currentYearMonth.month.name} ${currentYearMonth.year}",
-                            style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary
+                            text = "${currentYearMonth.month.name} ${currentYearMonth.year}",
+                            style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface
                         )
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceAround) {
                             listOf("Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс").forEach { dayName ->
@@ -562,18 +557,19 @@ fun HistoryScreen(historyList: List<DailyTracker>, onBackClick: () -> Unit) {
                                 val dateStr = String.format("%d-%02d-%02d", currentYearMonth.year, currentYearMonth.monthValue, dayNum)
                                 val tracker = historyMap[dateStr]
                                 val isCompleted = tracker != null && (tracker.stepsCount >= tracker.stepsGoal || tracker.pushUpsCount >= tracker.pushUpsGoal || tracker.squatsCount >= tracker.squatsGoal || tracker.distanceKm >= tracker.distanceGoalKm)
-                                val cellColor = when {
-                                    isCompleted -> MaterialTheme.colorScheme.primaryContainer
-                                    tracker != null -> MaterialTheme.colorScheme.secondaryContainer
-                                    else -> MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
-                                }
-                                val textColor = when {
-                                    isCompleted -> MaterialTheme.colorScheme.onPrimaryContainer
-                                    tracker != null -> MaterialTheme.colorScheme.onSecondaryContainer
-                                    else -> MaterialTheme.colorScheme.onSurfaceVariant
-                                }
-                                Box(modifier = Modifier.size(36.dp).clip(CircleShape).background(cellColor), contentAlignment = Alignment.Center) {
-                                    Text(text = "$dayNum", style = MaterialTheme.typography.bodyMedium, fontWeight = if (isCompleted) FontWeight.Bold else FontWeight.Normal, color = textColor)
+                                Box(
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .clip(CircleShape)
+                                        .background(if (isCompleted) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.surfaceVariant),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "$dayNum",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = if (isCompleted) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (isCompleted) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.onSurface
+                                    )
                                 }
                             }
                         }
@@ -584,16 +580,17 @@ fun HistoryScreen(historyList: List<DailyTracker>, onBackClick: () -> Unit) {
             items(historyList) { day ->
                 Card(
                     shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                    modifier = Modifier.fillMaxWidth()
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                    modifier = Modifier.fillMaxWidth().border(1.5.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(20.dp))
                 ) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(text = "📅 ${day.date}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                        Divider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
-                        Text("👣 Шаги: ${day.stepsCount} / ${day.stepsGoal}")
-                        Text("📍 Дистанция: ${day.distanceKm} км / ${day.distanceGoalKm} км")
-                        Text("💪 Отжимания: ${day.pushUpsCount} / ${day.pushUpsGoal}")
-                        Text("🦵 Приседания: ${day.squatsCount} / ${day.squatsGoal}")
+                        Text(text = day.date, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                        Divider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+                        Text("Шаги: ${day.stepsCount} / ${day.stepsGoal}")
+                        Text("Дистанция: ${day.distanceKm} км / ${day.distanceGoalKm} км")
+                        Text("Отжимания: ${day.pushUpsCount} / ${day.pushUpsGoal}")
+                        Text("Приседания: ${day.squatsCount} / ${day.squatsGoal}")
                     }
                 }
             }
@@ -611,14 +608,14 @@ fun AddCustomActivityDialog(onDismiss: () -> Unit, onConfirm: (String, String, I
         title = { Text("Новая активность") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.verticalScroll(rememberScrollState())) {
-                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Название") }, singleLine = true, shape = RoundedCornerShape(16.dp))
-                OutlinedTextField(value = unit, onValueChange = { unit = it }, label = { Text("Единица (раз, мин)") }, singleLine = true, shape = RoundedCornerShape(16.dp))
-                OutlinedTextField(value = goal, onValueChange = { goal = it }, label = { Text("Цель") }, singleLine = true, shape = RoundedCornerShape(16.dp))
+                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Название") }, singleLine = true, shape = RoundedCornerShape(14.dp))
+                OutlinedTextField(value = unit, onValueChange = { unit = it }, label = { Text("Единица (раз, мин)") }, singleLine = true, shape = RoundedCornerShape(14.dp))
+                OutlinedTextField(value = goal, onValueChange = { goal = it }, label = { Text("Цель") }, singleLine = true, shape = RoundedCornerShape(14.dp))
             }
         },
         confirmButton = { TextButton(onClick = { if (name.isNotBlank()) onConfirm(name.trim(), unit.trim().ifBlank { "раз" }, goal.toIntOrNull() ?: 50) }) { Text("Создать") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } },
-        shape = RoundedCornerShape(28.dp)
+        shape = RoundedCornerShape(20.dp)
     )
 }
 
@@ -646,20 +643,16 @@ fun GoalsSettingsDialog(
                     FilterChip(selected = darkThemeMode == 2, onClick = { onThemeChange(2) }, label = { Text("Темная") })
                 }
                 Divider()
-                OutlinedTextField(value = steps, onValueChange = { steps = it }, label = { Text("Цель по шагам") }, singleLine = true, shape = RoundedCornerShape(16.dp))
-                OutlinedTextField(value = distance, onValueChange = { distance = it }, label = { Text("Цель по дистанции (км)") }, singleLine = true, shape = RoundedCornerShape(16.dp))
-                OutlinedTextField(value = pushUps, onValueChange = { pushUps = it }, label = { Text("Цель по отжиманиям") }, singleLine = true, shape = RoundedCornerShape(16.dp))
-                OutlinedTextField(value = squats, onValueChange = { squats = it }, label = { Text("Цель по приседаниям") }, singleLine = true, shape = RoundedCornerShape(16.dp))
+                OutlinedTextField(value = steps, onValueChange = { steps = it }, label = { Text("Цель по шагам") }, singleLine = true, shape = RoundedCornerShape(14.dp))
+                OutlinedTextField(value = distance, onValueChange = { distance = it }, label = { Text("Цель по дистанции (км)") }, singleLine = true, shape = RoundedCornerShape(14.dp))
+                OutlinedTextField(value = pushUps, onValueChange = { pushUps = it }, label = { Text("Цель по отжиманиям") }, singleLine = true, shape = RoundedCornerShape(14.dp))
+                OutlinedTextField(value = squats, onValueChange = { squats = it }, label = { Text("Цель по приседаниям") }, singleLine = true, shape = RoundedCornerShape(14.dp))
 
                 Spacer(modifier = Modifier.height(4.dp))
-                Button(onClick = onBackupClick, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
-                    Icon(imageVector = Icons.Rounded.CloudUpload, contentDescription = null)
-                    Spacer(modifier = Modifier.width(8.dp))
+                Button(onClick = onBackupClick, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)) {
                     Text("Создать бэкап")
                 }
-                OutlinedButton(onClick = onRestoreClick, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
-                    Icon(imageVector = Icons.Rounded.CloudDownload, contentDescription = null)
-                    Spacer(modifier = Modifier.width(8.dp))
+                OutlinedButton(onClick = onRestoreClick, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)) {
                     Text("Восстановить из файла")
                 }
             }
@@ -674,54 +667,61 @@ fun GoalsSettingsDialog(
             }) { Text("Сохранить") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } },
-        shape = RoundedCornerShape(28.dp)
+        shape = RoundedCornerShape(20.dp)
     )
 }
 
 @Composable
 fun MetricCard(
     title: String, value: String, unit: String, progress: Float, icon: ImageVector,
-    containerColor: Color, contentColor: Color,
     onActionClick: (() -> Unit)? = null, onEditClick: (() -> Unit)? = null, onDeleteClick: (() -> Unit)? = null
 ) {
     Card(
-        shape = RoundedCornerShape(28.dp), colors = CardDefaults.cardColors(containerColor = containerColor),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        modifier = Modifier.fillMaxWidth().let { if (onEditClick != null) it.clickable(onClick = onEditClick) else it }
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.5.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(20.dp))
+            .let { if (onEditClick != null) it.clickable(onClick = onEditClick) else it }
     ) {
-        Column(modifier = Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Icon(imageVector = icon, contentDescription = null, tint = contentColor, modifier = Modifier.size(26.dp))
-                    Text(text = title, style = MaterialTheme.typography.titleMedium, color = contentColor, fontWeight = FontWeight.Bold)
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Icon(imageVector = icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(24.dp))
+                    Text(text = title, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     if (onDeleteClick != null) {
-                        FilledIconButton(onClick = onDeleteClick, shape = RoundedCornerShape(16.dp), colors = IconButtonDefaults.filledIconButtonColors(containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.8f))) {
-                            Icon(imageVector = Icons.Rounded.Delete, contentDescription = "Удалить", tint = MaterialTheme.colorScheme.onErrorContainer)
+                        FilledIconButton(onClick = onDeleteClick, shape = RoundedCornerShape(12.dp), colors = IconButtonDefaults.filledIconButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+                            Icon(imageVector = Icons.Rounded.Delete, contentDescription = "Удалить", tint = MaterialTheme.colorScheme.onSurface)
                         }
                     }
                     if (onEditClick != null) {
-                        FilledIconButton(onClick = onEditClick, shape = RoundedCornerShape(16.dp), colors = IconButtonDefaults.filledIconButtonColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.6f))) {
+                        FilledIconButton(onClick = onEditClick, shape = RoundedCornerShape(12.dp), colors = IconButtonDefaults.filledIconButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
                             Icon(imageVector = Icons.Rounded.Edit, contentDescription = "Править", tint = MaterialTheme.colorScheme.onSurface)
                         }
                     }
                     if (onActionClick != null) {
-                        FilledIconButton(onClick = onActionClick, shape = RoundedCornerShape(16.dp), colors = IconButtonDefaults.filledIconButtonColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.6f))) {
+                        FilledIconButton(onClick = onActionClick, shape = RoundedCornerShape(12.dp), colors = IconButtonDefaults.filledIconButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
                             Icon(imageVector = Icons.Rounded.Add, contentDescription = "Добавить", tint = MaterialTheme.colorScheme.onSurface)
                         }
                     }
                 }
             }
             Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(text = value, style = MaterialTheme.typography.displayMedium, fontWeight = FontWeight.ExtraBold, color = contentColor)
-                Text(text = unit, style = MaterialTheme.typography.bodyLarge, color = contentColor.copy(alpha = 0.7f), modifier = Modifier.padding(bottom = 8.dp))
+                Text(text = value, style = MaterialTheme.typography.displayMedium, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onSurface)
+                Text(text = unit, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 6.dp))
             }
             LinearProgressIndicator(
                 progress = { progress.coerceIn(0f, 1f) },
-                modifier = Modifier.fillMaxWidth().height(14.dp).clip(RoundedCornerShape(7.dp)),
-                color = contentColor,
-                trackColor = contentColor.copy(alpha = 0.12f)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(10.dp)
+                    .clip(RoundedCornerShape(5.dp))
+                    .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(5.dp)),
+                color = MaterialTheme.colorScheme.onSurface,
+                trackColor = MaterialTheme.colorScheme.surfaceVariant
             )
         }
     }
