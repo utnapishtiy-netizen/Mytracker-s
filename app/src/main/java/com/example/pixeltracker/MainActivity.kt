@@ -39,6 +39,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.work.*
 import com.example.pixeltracker.data.AppDatabase
@@ -58,7 +59,9 @@ import java.io.BufferedReader
 import java.io.File
 import java.io.InputStreamReader
 import java.text.SimpleDateFormat
+import java.time.LocalDate
 import java.time.YearMonth
+import java.time.format.TextStyle
 import java.util.Date
 import java.util.Locale
 import java.util.concurrent.TimeUnit
@@ -73,10 +76,10 @@ fun triggerHapticFeedback(context: Context) {
             context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            vibrator.vibrate(VibrationEffect.createOneShot(40, VibrationEffect.DEFAULT_AMPLITUDE))
+            vibrator.vibrate(VibrationEffect.createOneShot(35, VibrationEffect.DEFAULT_AMPLITUDE))
         } else {
             @Suppress("DEPRECATION")
-            vibrator.vibrate(40)
+            vibrator.vibrate(35)
         }
     } catch (e: Exception) {
         e.printStackTrace()
@@ -263,7 +266,8 @@ fun MainTrackerApp(
                     FloatingActionButton(
                         onClick = { triggerHapticFeedback(context); showAddActivityDialog = true },
                         containerColor = MaterialTheme.colorScheme.primaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        shape = RoundedCornerShape(20.dp)
                     ) {
                         Icon(imageVector = Icons.Rounded.Add, contentDescription = "Добавить")
                     }
@@ -277,12 +281,62 @@ fun MainTrackerApp(
                         .padding(20.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
+                    // Стильная строка дней недели (как на референсе)
+                    Card(
+                        shape = RoundedCornerShape(24.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            val today = LocalDate.now()
+                            val formatter = SimpleDateFormat("EEEE, d MMMM", Locale("ru"))
+                            Text(
+                                text = "✨ ${formatter.format(Date()).replaceFirstChar { it.uppercase() }}",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                (-3..3).forEach { offset ->
+                                    val date = today.plusDays(offset.toLong())
+                                    val isSelected = offset == 0
+                                    val dayLetter = date.dayOfWeek.getDisplayName(TextStyle.NARROW, Locale("ru"))
+                                    val dayNum = date.dayOfMonth
+
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(16.dp))
+                                            .background(if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent)
+                                            .padding(horizontal = 8.dp, vertical = 6.dp)
+                                    ) {
+                                        Text(
+                                            text = dayLetter,
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(
+                                            text = "$dayNum",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     MetricCard(
                         title = "Шаги", value = "$steps", unit = "/ $stepsGoal",
                         progress = if (stepsGoal > 0) steps.toFloat() / stepsGoal else 0f,
                         icon = Icons.Rounded.DirectionsWalk,
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                         onActionClick = { triggerHapticFeedback(context); viewModel.addSteps(500) },
                         onEditClick = { triggerHapticFeedback(context); editingMetric = EditMetricType.Steps(steps) }
                     )
@@ -291,8 +345,8 @@ fun MainTrackerApp(
                         title = "Дистанция", value = "%.2f".format(distance), unit = "км / $distanceGoal км",
                         progress = if (distanceGoal > 0f) distance / distanceGoal else 0f,
                         icon = Icons.Rounded.Map,
-                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                         onActionClick = { triggerHapticFeedback(context); viewModel.addDistance(1.0f) },
                         onEditClick = { triggerHapticFeedback(context); editingMetric = EditMetricType.Distance(distance) }
                     )
@@ -301,8 +355,8 @@ fun MainTrackerApp(
                         title = "Отжимания", value = "$pushUps", unit = "/ $pushUpsGoal",
                         progress = if (pushUpsGoal > 0) pushUps.toFloat() / pushUpsGoal else 0f,
                         icon = Icons.Rounded.FitnessCenter,
-                        containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                         onActionClick = { triggerHapticFeedback(context); viewModel.addPushUps(10) },
                         onEditClick = { triggerHapticFeedback(context); editingMetric = EditMetricType.PushUps(pushUps) }
                     )
@@ -326,8 +380,8 @@ fun MainTrackerApp(
                             title = activity.name, value = "$currentCount", unit = "${activity.unit} / $goalCount",
                             progress = if (goalCount > 0) currentCount.toFloat() / goalCount else 0f,
                             icon = Icons.Rounded.Star,
-                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                             onActionClick = { triggerHapticFeedback(context); viewModel.addCustomProgress(activity.id, 5, goalCount) },
                             onEditClick = { triggerHapticFeedback(context); editingMetric = EditMetricType.Custom(activity.id, activity.name, currentCount, goalCount) },
                             onDeleteClick = { triggerHapticFeedback(context); activityToDelete = activity }
@@ -632,13 +686,13 @@ fun MetricCard(
 ) {
     Card(
         shape = RoundedCornerShape(28.dp), colors = CardDefaults.cardColors(containerColor = containerColor),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         modifier = Modifier.fillMaxWidth().let { if (onEditClick != null) it.clickable(onClick = onEditClick) else it }
     ) {
         Column(modifier = Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Icon(imageVector = icon, contentDescription = null, tint = contentColor, modifier = Modifier.size(28.dp))
+                    Icon(imageVector = icon, contentDescription = null, tint = contentColor, modifier = Modifier.size(26.dp))
                     Text(text = title, style = MaterialTheme.typography.titleMedium, color = contentColor, fontWeight = FontWeight.Bold)
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -661,13 +715,13 @@ fun MetricCard(
             }
             Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(text = value, style = MaterialTheme.typography.displayMedium, fontWeight = FontWeight.ExtraBold, color = contentColor)
-                Text(text = unit, style = MaterialTheme.typography.bodyLarge, color = contentColor.copy(alpha = 0.8f), modifier = Modifier.padding(bottom = 8.dp))
+                Text(text = unit, style = MaterialTheme.typography.bodyLarge, color = contentColor.copy(alpha = 0.7f), modifier = Modifier.padding(bottom = 8.dp))
             }
             LinearProgressIndicator(
                 progress = { progress.coerceIn(0f, 1f) },
-                modifier = Modifier.fillMaxWidth().height(16.dp).clip(RoundedCornerShape(8.dp)),
+                modifier = Modifier.fillMaxWidth().height(14.dp).clip(RoundedCornerShape(7.dp)),
                 color = contentColor,
-                trackColor = contentColor.copy(alpha = 0.15f)
+                trackColor = contentColor.copy(alpha = 0.12f)
             )
         }
     }
