@@ -36,6 +36,10 @@ android {
     }
     kotlinOptions {
         jvmTarget = "17"
+        freeCompilerArgs += listOf(
+            "-P",
+            "plugin:androidx.compose.compiler.plugins.kotlin:suppressKotlinVersionCompatibilityCheck=true"
+        )
     }
     buildFeatures {
         compose = true
@@ -48,9 +52,6 @@ android {
             excludes += "/META-INF/{AL2.0}/{LGPL2.1}"
         }
     }
-    
-    // Принудительно подавляем ошибку несовместимости версии Compose Compiler с Kotlin 1.9.24
-    additionalProperties['suppressKotlinVersionCompatibilityCheck'] = 'true'
 }
 
 dependencies {
