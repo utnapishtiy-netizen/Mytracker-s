@@ -9,6 +9,12 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface TrackerDao {
 
+    @Query("SELECT * FROM custom_activities")
+    suspend fun getAllCustomActivitiesSync(): List<CustomActivityEntity>
+
+    @Query("SELECT * FROM notes")
+    suspend fun getAllNotesSync(): List<NoteEntity>
+
     @Query("SELECT * FROM daily_tracker WHERE date = :date LIMIT 1")
     fun getTrackerByDate(date: String): Flow<DailyTracker?>
 
