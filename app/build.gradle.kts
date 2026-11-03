@@ -41,7 +41,8 @@ android {
         compose = true
     }
     composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.8"
+        // Обновляем версию компилятора Compose для полной совместимости с Kotlin 1.9.24
+        kotlinCompilerExtensionVersion = "1.5.10"
     }
     packaging {
         resources {
