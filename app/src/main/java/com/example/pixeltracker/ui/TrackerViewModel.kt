@@ -26,7 +26,9 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
 
     private val sensorManager = application.getSystemService(Context.SENSOR_SERVICE) as SensorManager
     private val stepSensor = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_COUNTER)
-    private var initialStepCount = -1f
+    
+    // Храним базовое значение шагов устройства за день, чтобы корректно прибавлять дельту
+    private var lastSensorValue = -1f
 
     private val _currentDate = MutableStateFlow(LocalDate.now().toString())
     val currentDate: StateFlow<String> = _currentDate.asStateFlow()
@@ -89,23 +91,29 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
 
     override fun onSensorChanged(event: SensorEvent?) {
         if (event?.sensor?.type == Sensor.TYPE_STEP_COUNTER) {
-            val totalStepsFromDevice = event.values[0]
-            if (initialStepCount < 0f) {
-                initialStepCount = totalStepsFromDevice
+            val currentSensorSteps = event.values[0]
+            
+            if (lastSensorValue < 0f) {
+                lastSensorValue = currentSensorSteps
+                return
             }
-            val sessionSteps = (totalStepsFromDevice - initialStepCount).toInt()
-            if (sessionSteps >= 0) {
+
+            val deltaSteps = (currentSensorSteps - lastSensorValue).toInt()
+            if (deltaSteps > 0) {
+                lastSensorValue = currentSensorSteps
                 viewModelScope.launch(Dispatchers.IO) {
                     checkAndUpdateDate()
                     val existingTracker = dao.getTrackerByDateSync(_currentDate.value)
-                    val baseStoredSteps = existingTracker?.stepsCount ?: 0
+                    val currentStoredSteps = existingTracker?.stepsCount ?: 0
+                    val newSteps = currentStoredSteps + deltaSteps
+                    val newDistance = newSteps * 0.00075f
                     
-                    if (sessionSteps > baseStoredSteps) {
-                        val newDistance = sessionSteps * 0.00075f
-                        dao.updateSteps(_currentDate.value, sessionSteps)
-                        dao.updateDistance(_currentDate.value, newDistance)
-                    }
+                    dao.updateSteps(_currentDate.value, newSteps)
+                    dao.updateDistance(_currentDate.value, newDistance)
                 }
+            } else if (deltaSteps < 0) {
+                // Если телефон перезагружался, системный счетчик мог сброситься в 0
+                lastSensorValue = currentSensorSteps
             }
         }
     }
@@ -120,7 +128,7 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
         val todayStr = LocalDate.now().toString()
         if (_currentDate.value != todayStr) {
             _currentDate.value = todayStr
-            initialStepCount = -1f
+            lastSensorValue = -1f
         }
         runBlocking(Dispatchers.IO) {
             val existing = dao.getTrackerByDateSync(todayStr)
@@ -257,7 +265,6 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    // Алиас для совместимости с MainActivity
     fun addCustomProgress(activityId: Long, delta: Int, goal: Int) {
         addCustomActivityProgress(activityId, delta, goal)
     }
