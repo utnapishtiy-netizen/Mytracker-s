@@ -9,11 +9,10 @@ import androidx.room.RoomDatabase
     entities = [
         DailyTracker::class,
         CustomActivityEntity::class,
-        ActivityProgressEntity::class,
         NoteEntity::class,
         RoutePointEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
