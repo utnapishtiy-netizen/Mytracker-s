@@ -9,6 +9,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.pixeltracker.TrackerViewModel
 
 @Composable
 fun AchievementsScreen(
@@ -23,16 +24,8 @@ fun AchievementsScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Text(
-            text = "ДОСТИЖЕНИЯ",
-            color = Color.White,
-            fontSize = 18.sp
-        )
+        Text(text = "ДОСТИЖЕНИЯ", color = Color.White, fontSize = 18.sp)
         Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = "Раздел в разработке",
-            color = Color.Gray,
-            fontSize = 14.sp
-        )
+        Text(text = "Раздел в разработке", color = Color.Gray, fontSize = 14.sp)
     }
 }
