@@ -9,12 +9,6 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface TrackerDao {
 
-    @Query("SELECT * FROM custom_activities")
-    suspend fun getAllCustomActivitiesSync(): List<CustomActivityEntity>
-
-    @Query("SELECT * FROM notes")
-    suspend fun getAllNotesSync(): List<NoteEntity>
-
     @Query("SELECT * FROM daily_tracker WHERE date = :date LIMIT 1")
     fun getTrackerByDate(date: String): Flow<DailyTracker?>
 
@@ -30,7 +24,36 @@ interface TrackerDao {
     @Query("UPDATE daily_tracker SET stepsCount = :steps WHERE date = :date")
     suspend fun updateSteps(date: String, steps: Int)
 
-    // Точки маршрута GPS
+    @Query("UPDATE daily_tracker SET stepsGoal = :goal WHERE date = :date")
+    suspend fun updateGoal(date: String, goal: Int)
+
+    // Кастомные активности
+    @Query("SELECT * FROM custom_activities")
+    fun getAllCustomActivities(): Flow<List<CustomActivityEntity>>
+
+    @Query("SELECT * FROM custom_activities")
+    suspend fun getAllCustomActivitiesSync(): List<CustomActivityEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertCustomActivity(activity: CustomActivityEntity)
+
+    @Query("DELETE FROM custom_activities WHERE id = :id")
+    suspend fun deleteCustomActivity(id: Long)
+
+    // Заметки
+    @Query("SELECT * FROM notes ORDER BY timestamp DESC")
+    fun getAllNotes(): Flow<List<NoteEntity>>
+
+    @Query("SELECT * FROM notes")
+    suspend fun getAllNotesSync(): List<NoteEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertNote(note: NoteEntity)
+
+    @Query("DELETE FROM notes WHERE id = :id")
+    suspend fun deleteNote(id: Long)
+
+    // GPS точки маршрута
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertRoutePoint(point: RoutePointEntity)
 
