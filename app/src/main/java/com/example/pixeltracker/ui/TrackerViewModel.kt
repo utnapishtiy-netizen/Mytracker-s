@@ -23,7 +23,6 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
     private val currentDate: String
         get() = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
 
-    // Поток текущего дня
     private val todayTrackerFlow: StateFlow<DailyTracker?> = dao.getTrackerByDate(currentDate)
         .stateIn(
             scope = viewModelScope,
@@ -43,10 +42,8 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
         .map { it?.distanceKm ?: 0f }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0f)
 
-    // Поток всех записей для экрана истории
     val allTrackers: Flow<List<DailyTracker>> = dao.getAllTrackers()
 
-    // Методы для работы с шагами и целями
     fun updateSteps(newSteps: Int) {
         viewModelScope.launch {
             val existing = dao.getTrackerByDateSync(currentDate)
