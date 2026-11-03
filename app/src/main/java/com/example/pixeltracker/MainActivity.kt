@@ -1,720 +1,170 @@
 package com.example.pixeltracker
 
 import android.Manifest
-import android.app.Activity
-import android.content.Context
-import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
-import android.os.VibrationEffect
-import android.os.Vibrator
-import android.os.VibratorManager
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.*
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.work.*
-import com.example.pixeltracker.data.AppDatabase
-import com.example.pixeltracker.data.BackupWorker
-import com.example.pixeltracker.data.DailyTracker
-import com.example.pixeltracker.data.ReminderWorker
-import com.example.pixeltracker.ui.AchievementsScreen
-import com.example.pixeltracker.ui.NotesScreen
-import com.example.pixeltracker.ui.StatsScreen
-import com.example.pixeltracker.ui.TrackerViewModel
-import com.example.pixeltracker.ui.theme.PixelTrackerTheme
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import java.io.BufferedReader
-import java.io.File
-import java.io.InputStreamReader
-import java.text.SimpleDateFormat
-import java.time.LocalDate
-import java.time.YearMonth
-import java.time.format.TextStyle
-import java.util.Date
-import java.util.Locale
-import java.util.concurrent.TimeUnit
-
-fun triggerHapticFeedback(context: Context) {
-    try {
-        val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val vibratorManager = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
-            vibratorManager.defaultVibrator
-        } else {
-            @Suppress("DEPRECATION")
-            context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            vibrator.vibrate(VibrationEffect.createOneShot(35, VibrationEffect.DEFAULT_AMPLITUDE))
-        } else {
-            @Suppress("DEPRECATION")
-            vibrator.vibrate(35)
-        }
-    } catch (e: Exception) {
-        e.printStackTrace()
-    }
-}
+import com.example.pixeltracker.ui.*
 
 class MainActivity : ComponentActivity() {
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
-    ) { _ -> }
-
-    private val openFileLauncher = registerForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
-            result.data?.data?.let { uri ->
-                try {
-                    contentResolver.openInputStream(uri)?.use { inputStream ->
-                        BufferedReader(InputStreamReader(inputStream)).use { reader ->
-                            val content = reader.readText()
-                            Toast.makeText(this, "Бэкап успешно прочитан (${content.length} символов)", Toast.LENGTH_LONG).show()
-                        }
-                    }
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                    Toast.makeText(this, "Ошибка чтения файла бэкапа", Toast.LENGTH_SHORT).show()
-                }
-            }
-        }
-    }
-
-    fun triggerFilePicker() {
-        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
-            addCategory(Intent.CATEGORY_OPENABLE)
-            type = "text/plain"
-        }
-        openFileLauncher.launch(intent)
+    ) { permissions ->
+        // Обработка разрешений (уведомления, шаги, геолокация)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        val permissions = mutableListOf(Manifest.permission.ACTIVITY_RECOGNITION)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            permissions.add(Manifest.permission.POST_NOTIFICATIONS)
-        }
-        requestPermissionLauncher.launch(permissions.toTypedArray())
-
-        val backupRequest = PeriodicWorkRequestBuilder<BackupWorker>(24, TimeUnit.HOURS)
-            .setConstraints(Constraints.Builder().setRequiresDeviceIdle(true).build())
-            .build()
-        WorkManager.getInstance(applicationContext).enqueueUniquePeriodicWork(
-            "MyTrackerDailyBackup", ExistingPeriodicWorkPolicy.KEEP, backupRequest
-        )
-
-        val reminderRequest = PeriodicWorkRequestBuilder<ReminderWorker>(24, TimeUnit.HOURS).build()
-        WorkManager.getInstance(applicationContext).enqueueUniquePeriodicWork(
-            "MyTrackerReminder", ExistingPeriodicWorkPolicy.KEEP, reminderRequest
-        )
+        checkAndRequestPermissions()
 
         setContent {
-            var darkThemeMode by remember { mutableStateOf(2) }
-            val useDarkTheme = when (darkThemeMode) {
-                1 -> false
-                2 -> true
-                else -> androidx.compose.foundation.isSystemInDarkTheme()
+            // Строгий монохромный e-ink стиль (Черный фон, белый текст)
+            Surface(
+                modifier = Modifier.fillMaxSize(),
+                color = Color.Black
+            ) {
+                MainContainer()
             }
+        }
+    }
 
-            PixelTrackerTheme(darkTheme = useDarkTheme) {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
-                ) {
-                    MainTrackerApp(
-                        darkThemeMode = darkThemeMode,
-                        onThemeChange = { darkThemeMode = it },
-                        onImportClick = { triggerFilePicker() }
-                    )
-                }
+    private fun checkAndRequestPermissions() {
+        val permissionsToRequest = mutableListOf<String>()
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                permissionsToRequest.add(Manifest.permission.POST_NOTIFICATIONS)
             }
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACTIVITY_RECOGNITION) != PackageManager.PERMISSION_GRANTED) {
+                permissionsToRequest.add(Manifest.permission.ACTIVITY_RECOGNITION)
+            }
+        }
+
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            permissionsToRequest.add(Manifest.permission.ACCESS_FINE_LOCATION)
+        }
+
+        if (permissionsToRequest.isNotEmpty()) {
+            requestPermissionLauncher.launch(permissionsToRequest.toTypedArray())
         }
     }
 }
 
-sealed class Screen {
-    object Tracker : Screen()
-    object Notes : Screen()
-    object History : Screen()
-    object Stats : Screen()
-    object Achievements : Screen()
+enum class Screen {
+    TRACKER, STATS, MAP, HISTORY, NOTES, ACHIEVEMENTS
 }
 
-sealed class EditMetricType {
-    data class Steps(val current: Int) : EditMetricType()
-    data class Distance(val current: Float) : EditMetricType()
-    data class PushUps(val current: Int) : EditMetricType()
-    data class Squats(val current: Int) : EditMetricType()
-    data class Custom(val activityId: Long, val title: String, val current: Int, val goal: Int) : EditMetricType()
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MainTrackerApp(
-    viewModel: TrackerViewModel = viewModel(),
-    darkThemeMode: Int,
-    onThemeChange: (Int) -> Unit,
-    onImportClick: () -> Unit
-) {
-    val context = LocalContext.current
-    var currentScreen by remember { mutableStateOf<Screen>(Screen.Tracker) }
-    var showSettingsDialog by remember { mutableStateOf(false) }
-    var showAddActivityDialog by remember { mutableStateOf(false) }
-    var editingMetric by remember { mutableStateOf<EditMetricType?>(null) }
-    var activityToDelete by remember { mutableStateOf<com.example.pixeltracker.data.CustomActivityEntity?>(null) }
-
-    val steps by viewModel.todaySteps.collectAsState()
-    val distance by viewModel.todayDistanceKm.collectAsState()
-    val pushUps by viewModel.todayPushUps.collectAsState()
-    val squats by viewModel.todaySquats.collectAsState()
-    val streak by viewModel.currentStreak.collectAsState()
-
-    val stepsGoal by viewModel.stepsGoal.collectAsState()
-    val pushUpsGoal by viewModel.pushUpsGoal.collectAsState()
-    val squatsGoal by viewModel.squatsGoal.collectAsState()
-    val distanceGoal by viewModel.distanceGoalKm.collectAsState()
-
-    val historyList by viewModel.allHistory.collectAsState()
-    val customActivities by viewModel.customActivities.collectAsState()
-    val customProgress by viewModel.todayCustomProgress.collectAsState()
-
-    when (currentScreen) {
-        is Screen.Notes -> {
-            NotesScreen(viewModel = viewModel, onBackClick = { currentScreen = Screen.Tracker })
-        }
-        is Screen.History -> {
-            HistoryScreen(historyList = historyList, onBackClick = { currentScreen = Screen.Tracker })
-        }
-        is Screen.Stats -> {
-            StatsScreen(historyList = historyList, onBackClick = { currentScreen = Screen.Tracker })
-        }
-        is Screen.Achievements -> {
-            AchievementsScreen(
-                historyList = historyList,
-                currentStreak = streak,
-                onBackClick = { currentScreen = Screen.Tracker }
-            )
-        }
-        is Screen.Tracker -> {
-            Scaffold(
-                topBar = {
-                    TopAppBar(
-                        title = { /* Пустой заголовок, убраны любые названия */ },
-                        actions = {
-                            IconButton(onClick = { triggerHapticFeedback(context); viewModel.refreshData() }) {
-                                Icon(imageVector = Icons.Rounded.Refresh, contentDescription = "Обновить")
-                            }
-                            IconButton(onClick = { triggerHapticFeedback(context); currentScreen = Screen.Achievements }) {
-                                Icon(imageVector = Icons.Rounded.EmojiEvents, contentDescription = "Достижения")
-                            }
-                            IconButton(onClick = { triggerHapticFeedback(context); currentScreen = Screen.Stats }) {
-                                Icon(imageVector = Icons.Rounded.BarChart, contentDescription = "Статистика")
-                            }
-                            IconButton(onClick = { triggerHapticFeedback(context); currentScreen = Screen.History }) {
-                                Icon(imageVector = Icons.Rounded.CalendarMonth, contentDescription = "Календарь")
-                            }
-                            IconButton(onClick = { triggerHapticFeedback(context); currentScreen = Screen.Notes }) {
-                                Icon(imageVector = Icons.Rounded.Note, contentDescription = "Заметки")
-                            }
-                            IconButton(onClick = { triggerHapticFeedback(context); showSettingsDialog = true }) {
-                                Icon(imageVector = Icons.Rounded.Settings, contentDescription = "Настройки")
-                            }
-                        }
-                    )
-                },
-                floatingActionButton = {
-                    FloatingActionButton(
-                        onClick = { triggerHapticFeedback(context); showAddActivityDialog = true },
-                        containerColor = MaterialTheme.colorScheme.surface,
-                        contentColor = MaterialTheme.colorScheme.onSurface,
-                        shape = RoundedCornerShape(16.dp),
-                        modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(16.dp))
-                    ) {
-                        Icon(imageVector = Icons.Rounded.Add, contentDescription = "Добавить")
-                    }
-                }
-            ) { innerPadding ->
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(innerPadding)
-                        .verticalScroll(rememberScrollState())
-                        .padding(20.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    Card(
-                        shape = RoundedCornerShape(20.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .border(1.5.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(20.dp))
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            val today = LocalDate.now()
-                            val formatter = SimpleDateFormat("EEEE, d MMMM", Locale("ru"))
-                            Text(
-                                text = formatter.format(Date()).replaceFirstChar { it.uppercase() },
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                (-3..3).forEach { offset ->
-                                    val date = today.plusDays(offset.toLong())
-                                    val isSelected = offset == 0
-                                    val dayLetter = date.dayOfWeek.getDisplayName(TextStyle.NARROW, Locale("ru"))
-                                    val dayNum = date.dayOfMonth
-
-                                    Column(
-                                        horizontalAlignment = Alignment.CenterHorizontally,
-                                        modifier = Modifier
-                                            .clip(RoundedCornerShape(12.dp))
-                                            .background(if (isSelected) MaterialTheme.colorScheme.onSurface else Color.Transparent)
-                                            .padding(horizontal = 8.dp, vertical = 6.dp)
-                                    ) {
-                                        Text(
-                                            text = dayLetter,
-                                            style = MaterialTheme.typography.labelMedium,
-                                            color = if (isSelected) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                        Spacer(modifier = Modifier.height(4.dp))
-                                        Text(
-                                            text = "$dayNum",
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            fontWeight = FontWeight.Bold,
-                                            color = if (isSelected) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.onSurface
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    MetricCard(
-                        title = "Шаги", value = "$steps", unit = "/ $stepsGoal",
-                        progress = if (stepsGoal > 0) steps.toFloat() / stepsGoal else 0f,
-                        icon = Icons.Rounded.DirectionsWalk,
-                        onActionClick = { triggerHapticFeedback(context); viewModel.addSteps(500) },
-                        onEditClick = { triggerHapticFeedback(context); editingMetric = EditMetricType.Steps(steps) }
-                    )
-
-                    MetricCard(
-                        title = "Дистанция", value = "%.2f".format(distance), unit = "км / $distanceGoal км",
-                        progress = if (distanceGoal > 0f) distance / distanceGoal else 0f,
-                        icon = Icons.Rounded.Map,
-                        onActionClick = { triggerHapticFeedback(context); viewModel.addDistance(1.0f) },
-                        onEditClick = { triggerHapticFeedback(context); editingMetric = EditMetricType.Distance(distance) }
-                    )
-
-                    MetricCard(
-                        title = "Отжимания", value = "$pushUps", unit = "/ $pushUpsGoal",
-                        progress = if (pushUpsGoal > 0) pushUps.toFloat() / pushUpsGoal else 0f,
-                        icon = Icons.Rounded.FitnessCenter,
-                        onActionClick = { triggerHapticFeedback(context); viewModel.addPushUps(10) },
-                        onEditClick = { triggerHapticFeedback(context); editingMetric = EditMetricType.PushUps(pushUps) }
-                    )
-
-                    MetricCard(
-                        title = "Приседания", value = "$squats", unit = "/ $squatsGoal",
-                        progress = if (squatsGoal > 0) squats.toFloat() / squatsGoal else 0f,
-                        icon = Icons.Rounded.AccessibilityNew,
-                        onActionClick = { triggerHapticFeedback(context); viewModel.addSquats(10) },
-                        onEditClick = { triggerHapticFeedback(context); editingMetric = EditMetricType.Squats(squats) }
-                    )
-
-                    customActivities.forEach { activity ->
-                        val progressItem = customProgress.find { it.activityId == activity.id }
-                        val currentCount = progressItem?.currentCount ?: 0
-                        val goalCount = progressItem?.goalCount ?: activity.defaultGoal
-
-                        MetricCard(
-                            title = activity.name, value = "$currentCount", unit = "${activity.unit} / $goalCount",
-                            progress = if (goalCount > 0) currentCount.toFloat() / goalCount else 0f,
-                            icon = Icons.Rounded.Star,
-                            onActionClick = { triggerHapticFeedback(context); viewModel.addCustomProgress(activity.id, 5, goalCount) },
-                            onEditClick = { triggerHapticFeedback(context); editingMetric = EditMetricType.Custom(activity.id, activity.name, currentCount, goalCount) },
-                            onDeleteClick = { triggerHapticFeedback(context); activityToDelete = activity }
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(64.dp))
-                }
-            }
-        }
-    }
-
-    activityToDelete?.let { activity ->
-        AlertDialog(
-            onDismissRequest = { activityToDelete = null },
-            title = { Text("Удалить активность?") },
-            text = { Text("Вы действительно хотите удалить «${activity.name}»?") },
-            confirmButton = {
-                TextButton(onClick = { viewModel.deleteCustomActivity(activity.id); activityToDelete = null }) {
-                    Text("Удалить", color = MaterialTheme.colorScheme.onSurface)
-                }
-            },
-            dismissButton = { TextButton(onClick = { activityToDelete = null }) { Text("Отмена") } },
-            shape = RoundedCornerShape(20.dp)
-        )
-    }
-
-    editingMetric?.let { metric ->
-        var inputVal by remember {
-            mutableStateOf(
-                when (metric) {
-                    is EditMetricType.Steps -> metric.current.toString()
-                    is EditMetricType.Distance -> metric.current.toString()
-                    is EditMetricType.PushUps -> metric.current.toString()
-                    is EditMetricType.Squats -> metric.current.toString()
-                    is EditMetricType.Custom -> metric.current.toString()
-                }
-            )
-        }
-        val dialogTitle = when (metric) {
-            is EditMetricType.Steps -> "Шаги: точное значение"
-            is EditMetricType.Distance -> "Дистанция (км): точное значение"
-            is EditMetricType.PushUps -> "Отжимания: точное значение"
-            is EditMetricType.Squats -> "Приседания: точное значение"
-            is EditMetricType.Custom -> "Корректировка: ${metric.title}"
-        }
-
-        AlertDialog(
-            onDismissRequest = { editingMetric = null },
-            title = { Text(dialogTitle) },
-            text = {
-                OutlinedTextField(
-                    value = inputVal, onValueChange = { inputVal = it },
-                    label = { Text("Значение") }, singleLine = true,
-                    shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth()
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    when (metric) {
-                        is EditMetricType.Steps -> viewModel.setSteps(inputVal.toIntOrNull() ?: 0)
-                        is EditMetricType.Distance -> viewModel.setDistance(inputVal.toFloatOrNull() ?: 0f)
-                        is EditMetricType.PushUps -> viewModel.setPushUps(inputVal.toIntOrNull() ?: 0)
-                        is EditMetricType.Squats -> viewModel.setSquats(inputVal.toIntOrNull() ?: 0)
-                        is EditMetricType.Custom -> viewModel.updateCustomProgress(metric.activityId, inputVal.toIntOrNull() ?: 0, metric.goal)
-                    }
-                    editingMetric = null
-                }) { Text("Установить") }
-            },
-            dismissButton = { TextButton(onClick = { editingMetric = null }) { Text("Отмена") } },
-            shape = RoundedCornerShape(20.dp)
-        )
-    }
-
-    if (showAddActivityDialog) {
-        AddCustomActivityDialog(
-            onDismiss = { showAddActivityDialog = false },
-            onConfirm = { name, unit, goal -> viewModel.addCustomActivity(name, unit, goal); showAddActivityDialog = false }
-        )
-    }
-
-    if (showSettingsDialog) {
-        val coroutineScope = rememberCoroutineScope()
-        GoalsSettingsDialog(
-            currentPushUpsGoal = pushUpsGoal, currentSquatsGoal = squatsGoal,
-            currentStepsGoal = stepsGoal, currentDistanceGoal = distanceGoal,
-            darkThemeMode = darkThemeMode,
-            onThemeChange = onThemeChange,
-            onDismiss = { showSettingsDialog = false },
-            onSave = { pU, sQ, sG, dG -> viewModel.updateGoals(pU, sQ, sG, dG); showSettingsDialog = false },
-            onBackupClick = {
-                coroutineScope.launch(Dispatchers.IO) {
-                    try {
-                        val db = AppDatabase.getDatabase(context)
-                        val dao = db.trackerDao()
-                        val history = dao.getAllTrackers().first()
-                        val customActivities = dao.getAllCustomActivities().first()
-                        val notes = dao.getAllNotes().first()
-
-                        val timestamp = SimpleDateFormat("yyyy-MM-dd_HH-mm", Locale.getDefault()).format(Date())
-                        val backupContent = buildString {
-                            appendLine("=== MYTRACKER MANUAL BACKUP ($timestamp) ===")
-                            appendLine("\n--- HISTORY ---")
-                            history.forEach { appendLine(it.toString()) }
-                            appendLine("\n--- CUSTOM ACTIVITIES ---")
-                            customActivities.forEach { appendLine(it.toString()) }
-                            appendLine("\n--- NOTES ---")
-                            notes.forEach { appendLine(it.toString()) }
-                        }
-
-                        val file = File(context.getExternalFilesDir(null), "MyTracker_Backup_$timestamp.txt")
-                        file.writeText(backupContent)
-
-                        withContext(Dispatchers.Main) {
-                            Toast.makeText(context, "Бэкап сохранен в файлы!", Toast.LENGTH_LONG).show()
-                        }
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                        withContext(Dispatchers.Main) { Toast.makeText(context, "Ошибка бэкапа", Toast.LENGTH_SHORT).show() }
-                    }
-                }
-            },
-            onRestoreClick = {
-                showSettingsDialog = false
-                onImportClick()
-            }
-        )
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun HistoryScreen(historyList: List<DailyTracker>, onBackClick: () -> Unit) {
-    val currentYearMonth = remember { YearMonth.now() }
-    val daysInMonth = remember { currentYearMonth.lengthOfMonth() }
-    val firstDayOfWeek = remember { currentYearMonth.atDay(1).dayOfWeek.value }
-    val historyMap = remember(historyList) { historyList.associateBy { it.date } }
+fun MainContainer() {
+    val viewModel: TrackerViewModel = viewModel()
+    var currentScreen by remember { mutableStateOf(Screen.TRACKER) }
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Календарь и история", fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Icon(imageVector = Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Назад")
-                    }
-                }
-            )
+        containerColor = Color.Black,
+        bottomBar = {
+            // Минималистичная нижняя панель навигации в e-ink стиле
+            NavigationBar(
+                containerColor = Color.Black,
+                contentColor = Color.White
+            ) {
+                NavigationBarItem(
+                    selected = currentScreen == Screen.TRACKER,
+                    onClick = { currentScreen = Screen.TRACKER },
+                    icon = { Icon(Icons.Default.Home, contentDescription = "Главная", tint = Color.White) },
+                    label = { Text("Трекер", color = Color.White, fontSize = 10.sp) }
+                )
+                NavigationBarItem(
+                    selected = currentScreen == Screen.STATS,
+                    onClick = { currentScreen = Screen.STATS },
+                    icon = { Icon(Icons.Default.List, contentDescription = "Статистика", tint = Color.White) },
+                    label = { Text("Цели", color = Color.White, fontSize = 10.sp) }
+                )
+                NavigationBarItem(
+                    selected = currentScreen == Screen.MAP,
+                    onClick = { currentScreen = Screen.MAP },
+                    icon = { Icon(Icons.Default.Place, contentDescription = "Карта", tint = Color.White) },
+                    label = { Text("Карта", color = Color.White, fontSize = 10.sp) }
+                )
+                NavigationBarItem(
+                    selected = currentScreen == Screen.HISTORY,
+                    onClick = { currentScreen = Screen.HISTORY },
+                    icon = { Icon(Icons.Default.DateRange, contentDescription = "История", tint = Color.White) },
+                    label = { Text("История", color = Color.White, fontSize = 10.sp) }
+                )
+                NavigationBarItem(
+                    selected = currentScreen == Screen.NOTES,
+                    onClick = { currentScreen = Screen.NOTES },
+                    icon = { Icon(Icons.Default.Create, contentDescription = "Заметки", tint = Color.White) },
+                    label = { Text("Заметки", color = Color.White, fontSize = 10.sp) }
+                )
+            }
         }
     ) { innerPadding ->
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(innerPadding).padding(horizontal = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-            contentPadding = PaddingValues(vertical = 12.dp)
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .background(Color.Black)
         ) {
-            item {
-                Card(
-                    shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-                    modifier = Modifier.fillMaxWidth().border(1.5.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(20.dp))
-                ) {
-                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            when (currentScreen) {
+                Screen.TRACKER -> {
+                    // Основной экран трекера шагов и активности
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        val steps by viewModel.todaySteps.collectAsState()
+                        val goal by viewModel.stepsGoal.collectAsState()
+                        val distance by viewModel.todayDistanceKm.collectAsState()
+
                         Text(
-                            text = "${currentYearMonth.month.name} ${currentYearMonth.year}",
-                            style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface
+                            text = "ШАГИ СЕГОДНЯ",
+                            color = Color.Gray,
+                            fontSize = 14.sp
                         )
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceAround) {
-                            listOf("Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс").forEach { dayName ->
-                                Text(text = dayName, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center, modifier = Modifier.width(36.dp))
-                            }
-                        }
-                        LazyVerticalGrid(
-                            columns = GridCells.Fixed(7), modifier = Modifier.fillMaxWidth().height(240.dp),
-                            horizontalArrangement = Arrangement.spacedBy(4.dp), verticalArrangement = Arrangement.spacedBy(4.dp), userScrollEnabled = false
-                        ) {
-                            items(firstDayOfWeek - 1) { Box(modifier = Modifier.size(36.dp)) }
-                            items(daysInMonth) { dayIndex ->
-                                val dayNum = dayIndex + 1
-                                val dateStr = String.format("%d-%02d-%02d", currentYearMonth.year, currentYearMonth.monthValue, dayNum)
-                                val tracker = historyMap[dateStr]
-                                val isCompleted = tracker != null && (tracker.stepsCount >= tracker.stepsGoal || tracker.pushUpsCount >= tracker.pushUpsGoal || tracker.squatsCount >= tracker.squatsGoal || tracker.distanceKm >= tracker.distanceGoalKm)
-                                Box(
-                                    modifier = Modifier
-                                        .size(36.dp)
-                                        .clip(CircleShape)
-                                        .background(if (isCompleted) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.surfaceVariant),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = "$dayNum",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = if (isCompleted) FontWeight.Bold else FontWeight.Normal,
-                                        color = if (isCompleted) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.onSurface
-                                    )
-                                }
-                            }
-                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "$steps",
+                            color = Color.White,
+                            fontSize = 54.sp
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Цель: $goal  |  Дистанция: String.format(\"%.2f\", distance) км",
+                            color = Color.LightGray,
+                            fontSize = 14.sp
+                        )
                     }
                 }
+                Screen.STATS -> StatsScreen(viewModel = viewModel)
+                Screen.MAP -> MapScreen()
+                Screen.HISTORY -> HistoryScreen(viewModel = viewModel)
+                Screen.NOTES -> NotesScreen(viewModel = viewModel)
+                Screen.ACHIEVEMENTS -> AchievementsScreen(viewModel = viewModel)
             }
-            item { Text("История результатов", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp)) }
-            items(historyList) { day ->
-                Card(
-                    shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-                    modifier = Modifier.fillMaxWidth().border(1.5.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(20.dp))
-                ) {
-                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(text = day.date, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
-                        Divider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
-                        Text("Шаги: ${day.stepsCount} / ${day.stepsGoal}")
-                        Text("Дистанция: ${day.distanceKm} км / ${day.distanceGoalKm} км")
-                        Text("Отжимания: ${day.pushUpsCount} / ${day.pushUpsGoal}")
-                        Text("Приседания: ${day.squatsCount} / ${day.squatsGoal}")
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun AddCustomActivityDialog(onDismiss: () -> Unit, onConfirm: (String, String, Int) -> Unit) {
-    var name by remember { mutableStateOf("") }
-    var unit by remember { mutableStateOf("") }
-    var goal by remember { mutableStateOf("50") }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Новая активность") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.verticalScroll(rememberScrollState())) {
-                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Название") }, singleLine = true, shape = RoundedCornerShape(14.dp))
-                OutlinedTextField(value = unit, onValueChange = { unit = it }, label = { Text("Единица (раз, мин)") }, singleLine = true, shape = RoundedCornerShape(14.dp))
-                OutlinedTextField(value = goal, onValueChange = { goal = it }, label = { Text("Цель") }, singleLine = true, shape = RoundedCornerShape(14.dp))
-            }
-        },
-        confirmButton = { TextButton(onClick = { if (name.isNotBlank()) onConfirm(name.trim(), unit.trim().ifBlank { "раз" }, goal.toIntOrNull() ?: 50) }) { Text("Создать") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } },
-        shape = RoundedCornerShape(20.dp)
-    )
-}
-
-@Composable
-fun GoalsSettingsDialog(
-    currentPushUpsGoal: Int, currentSquatsGoal: Int, currentStepsGoal: Int, currentDistanceGoal: Float,
-    darkThemeMode: Int, onThemeChange: (Int) -> Unit,
-    onDismiss: () -> Unit, onSave: (Int, Int, Int, Float) -> Unit,
-    onBackupClick: () -> Unit, onRestoreClick: () -> Unit
-) {
-    var pushUps by remember { mutableStateOf(currentPushUpsGoal.toString()) }
-    var squats by remember { mutableStateOf(currentSquatsGoal.toString()) }
-    var steps by remember { mutableStateOf(currentStepsGoal.toString()) }
-    var distance by remember { mutableStateOf(currentDistanceGoal.toString()) }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Настройки и бэкап") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.verticalScroll(rememberScrollState())) {
-                Text("Тема оформления", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    FilterChip(selected = darkThemeMode == 0, onClick = { onThemeChange(0) }, label = { Text("Системная") })
-                    FilterChip(selected = darkThemeMode == 1, onClick = { onThemeChange(1) }, label = { Text("Светлая") })
-                    FilterChip(selected = darkThemeMode == 2, onClick = { onThemeChange(2) }, label = { Text("Темная") })
-                }
-                Divider()
-                OutlinedTextField(value = steps, onValueChange = { steps = it }, label = { Text("Цель по шагам") }, singleLine = true, shape = RoundedCornerShape(14.dp))
-                OutlinedTextField(value = distance, onValueChange = { distance = it }, label = { Text("Цель по дистанции (км)") }, singleLine = true, shape = RoundedCornerShape(14.dp))
-                OutlinedTextField(value = pushUps, onValueChange = { pushUps = it }, label = { Text("Цель по отжиманиям") }, singleLine = true, shape = RoundedCornerShape(14.dp))
-                OutlinedTextField(value = squats, onValueChange = { squats = it }, label = { Text("Цель по приседаниям") }, singleLine = true, shape = RoundedCornerShape(14.dp))
-
-                Spacer(modifier = Modifier.height(4.dp))
-                Button(onClick = onBackupClick, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)) {
-                    Text("Создать бэкап")
-                }
-                OutlinedButton(onClick = onRestoreClick, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)) {
-                    Text("Восстановить из файла")
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = {
-                val pU = pushUps.toIntOrNull() ?: currentPushUpsGoal
-                val sQ = squats.toIntOrNull() ?: currentSquatsGoal
-                val sG = steps.toIntOrNull() ?: currentStepsGoal
-                val dG = distance.toFloatOrNull() ?: currentDistanceGoal
-                onSave(pU, sQ, sG, dG)
-            }) { Text("Сохранить") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } },
-        shape = RoundedCornerShape(20.dp)
-    )
-}
-
-@Composable
-fun MetricCard(
-    title: String, value: String, unit: String, progress: Float, icon: ImageVector,
-    onActionClick: (() -> Unit)? = null, onEditClick: (() -> Unit)? = null, onDeleteClick: (() -> Unit)? = null
-) {
-    Card(
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .border(1.5.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(20.dp))
-            .let { if (onEditClick != null) it.clickable(onClick = onEditClick) else it }
-    ) {
-        Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Icon(imageVector = icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(24.dp))
-                    Text(text = title, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    if (onDeleteClick != null) {
-                        FilledIconButton(onClick = onDeleteClick, shape = RoundedCornerShape(12.dp), colors = IconButtonDefaults.filledIconButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
-                            Icon(imageVector = Icons.Rounded.Delete, contentDescription = "Удалить", tint = MaterialTheme.colorScheme.onSurface)
-                        }
-                    }
-                    if (onEditClick != null) {
-                        FilledIconButton(onClick = onEditClick, shape = RoundedCornerShape(12.dp), colors = IconButtonDefaults.filledIconButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
-                            Icon(imageVector = Icons.Rounded.Edit, contentDescription = "Править", tint = MaterialTheme.colorScheme.onSurface)
-                        }
-                    }
-                    if (onActionClick != null) {
-                        FilledIconButton(onClick = onActionClick, shape = RoundedCornerShape(12.dp), colors = IconButtonDefaults.filledIconButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
-                            Icon(imageVector = Icons.Rounded.Add, contentDescription = "Добавить", tint = MaterialTheme.colorScheme.onSurface)
-                        }
-                    }
-                }
-            }
-            Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(text = value, style = MaterialTheme.typography.displayMedium, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onSurface)
-                Text(text = unit, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 6.dp))
-            }
-            LinearProgressIndicator(
-                progress = { progress.coerceIn(0f, 1f) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(10.dp)
-                    .clip(RoundedCornerShape(5.dp))
-                    .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(5.dp)),
-                color = MaterialTheme.colorScheme.onSurface,
-                trackColor = MaterialTheme.colorScheme.surfaceVariant
-            )
         }
     }
 }
