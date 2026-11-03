@@ -86,7 +86,6 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    // Симуляция бэкапа (экспорт/импорт данных)
     fun createBackup(onResult: (String) -> Unit) {
         viewModelScope.launch {
             try {
