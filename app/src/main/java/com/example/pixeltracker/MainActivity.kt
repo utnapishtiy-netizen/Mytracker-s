@@ -26,16 +26,13 @@ class MainActivity : ComponentActivity() {
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
-    ) { permissions ->
-        // Обработка разрешений (уведомления, шаги, геолокация)
-    }
+    ) { _ -> }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         checkAndRequestPermissions()
 
         setContent {
-            // Строгий монохромный e-ink стиль (Черный фон, белый текст)
             Surface(
                 modifier = Modifier.fillMaxSize(),
                 color = Color.Black
@@ -82,7 +79,6 @@ fun MainContainer() {
     Scaffold(
         containerColor = Color.Black,
         bottomBar = {
-            // Минималистичная нижняя панель навигации в e-ink стиле
             NavigationBar(
                 containerColor = Color.Black,
                 contentColor = Color.White
@@ -128,7 +124,6 @@ fun MainContainer() {
         ) {
             when (currentScreen) {
                 Screen.TRACKER -> {
-                    // Основной экран трекера шагов и активности
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
@@ -153,7 +148,7 @@ fun MainContainer() {
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "Цель: $goal  |  Дистанция: String.format(\"%.2f\", distance) км",
+                            text = "Цель: $goal  |  Дистанция: ${String.format("%.2f", distance)} км",
                             color = Color.LightGray,
                             fontSize = 14.sp
                         )
