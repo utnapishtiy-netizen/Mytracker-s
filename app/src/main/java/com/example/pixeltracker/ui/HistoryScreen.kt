@@ -11,6 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.pixeltracker.TrackerViewModel
 import com.example.pixeltracker.data.DailyTracker
 
 @Composable
@@ -36,8 +37,8 @@ fun HistoryScreen(
 
         if (historyList.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text(text = "Нет записей", color = Color.Gray, fontSize = 14.sp)
-        }
+                Text(text = "Нет записей", color = Color.Gray, fontSize = 14.sp)
+            }
         } else {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
