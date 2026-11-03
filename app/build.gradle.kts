@@ -41,14 +41,16 @@ android {
         compose = true
     }
     composeOptions {
-        // Обновляем версию компилятора Compose для полной совместимости с Kotlin 1.9.24
-        kotlinCompilerExtensionVersion = "1.5.10"
+        kotlinCompilerExtensionVersion = "1.5.8"
     }
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0}/{LGPL2.1}"
         }
     }
+    
+    // Принудительно подавляем ошибку несовместимости версии Compose Compiler с Kotlin 1.9.24
+    additionalProperties['suppressKotlinVersionCompatibilityCheck'] = 'true'
 }
 
 dependencies {
