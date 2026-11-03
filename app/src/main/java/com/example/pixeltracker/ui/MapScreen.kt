@@ -57,7 +57,7 @@ fun MapScreen(
             if (routePoints.size >= 2) {
                 Polyline(
                     points = routePoints,
-                    color = android.graphics.Color.WHITE,
+                    color = Color.White,
                     width = 12f
                 )
             }
