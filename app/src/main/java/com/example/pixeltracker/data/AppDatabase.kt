@@ -10,7 +10,8 @@ import androidx.room.RoomDatabase
         DailyTracker::class,
         CustomActivityEntity::class,
         ActivityProgressEntity::class,
-        NoteEntity::class
+        NoteEntity::class,
+        RoutePointEntity::class
     ],
     version = 2,
     exportSchema = false
@@ -18,7 +19,6 @@ import androidx.room.RoomDatabase
 abstract class AppDatabase : RoomDatabase() {
 
     abstract fun trackerDao(): TrackerDao
-    abstract fun noteDao(): NoteDao
 
     companion object {
         @Volatile
@@ -31,8 +31,8 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "pixel_tracker_database"
                 )
-                    .fallbackToDestructiveMigration()
-                    .build()
+                .fallbackToDestructiveMigration()
+                .build()
                 INSTANCE = instance
                 instance
             }
