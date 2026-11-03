@@ -13,8 +13,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.pixeltracker.LocationTrackingService // <-- Исправленный импорт (прямо из корня или вашего пакета сервисов)
 import com.example.pixeltracker.data.AppDatabase
-import com.example.pixeltracker.service.LocationTrackingService
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.maps.android.compose.GoogleMap
