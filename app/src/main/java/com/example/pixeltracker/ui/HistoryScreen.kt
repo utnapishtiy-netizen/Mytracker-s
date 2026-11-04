@@ -1,11 +1,14 @@
 package com.example.pixeltracker.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Text
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -25,45 +28,50 @@ fun HistoryScreen(
         modifier = modifier
             .fillMaxSize()
             .background(Color.Black)
-            .padding(16.dp)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text(
-            text = "ИСТОРИЯ ДНЕЙ",
+            text = "ИСТОРИЯ",
             color = Color.White,
             fontSize = 18.sp,
             modifier = Modifier.align(Alignment.CenterHorizontally)
         )
-        Spacer(modifier = Modifier.height(16.dp))
 
         if (historyList.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(text = "Нет записей", color = Color.Gray, fontSize = 14.sp)
+                Text(text = "Записей пока нет", color = Color.Gray, fontSize = 14.sp)
             }
         } else {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(historyList) { item ->
-                    HistoryItemRow(item = item)
+                items(historyList) { tracker: DailyTracker ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .border(1.dp, Color.DarkGray)
+                            .padding(12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(text = tracker.date, color = Color.White, fontSize = 14.sp)
+                            Text(
+                                text = "Отжимания: ${tracker.pushUpsCount} | Приседания: ${tracker.squatsCount}",
+                                color = Color.Gray,
+                                fontSize = 12.sp
+                            )
+                        }
+                        Text(
+                            text = "${tracker.stepsCount} / ${tracker.stepsGoal} ш",
+                            color = Color.White,
+                            fontSize = 14.sp
+                        )
+                    }
                 }
             }
         }
-    }
-}
-
-@Composable
-fun HistoryItemRow(item: DailyTracker) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(Color.DarkGray.copy(alpha = 0.3f))
-            .padding(12.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(text = item.date, color = Color.White, fontSize = 14.sp)
-        Text(text = "${item.stepsCount} шагов", color = Color.LightGray, fontSize = 14.sp)
-        Text(text = "${String.format("%.1f", item.distanceKm)} км", color = Color.Gray, fontSize = 12.sp)
     }
 }
