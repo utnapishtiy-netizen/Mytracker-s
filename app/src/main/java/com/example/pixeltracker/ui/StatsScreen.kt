@@ -22,11 +22,15 @@ fun StatsScreen(
     modifier: Modifier = Modifier
 ) {
     val currentGoal by viewModel.stepsGoal.collectAsState()
+    val pushUps by viewModel.todayPushUps.collectAsState()
+    val pGoal by viewModel.pushUpsGoal.collectAsState()
+    val squats by viewModel.todaySquats.collectAsState()
+    val sGoal by viewModel.squatsGoal.collectAsState()
     val activities by viewModel.customActivities.collectAsState(initial = emptyList())
 
     var goalInput by remember { mutableStateOf(currentGoal.toString()) }
-    var newActivityName by remember { mutableStateOf("") }
-    var backupStatus by remember { mutableStateOf("") }
+    var activityName by remember { mutableStateOf("") }
+    var activityUnit by remember { mutableStateOf("раз") }
 
     Column(
         modifier = modifier
@@ -36,16 +40,15 @@ fun StatsScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text(
-            text = "ЦЕЛИ И НАСТРОЙКИ",
+            text = "ЦЕЛИ И АКТИВНОСТИ",
             color = Color.White,
             fontSize = 18.sp,
             modifier = Modifier.align(Alignment.CenterHorizontally)
         )
 
-        // Блок цели по шагам
+        // Цель шагов
         Column(modifier = Modifier.fillMaxWidth()) {
-            Text(text = "Цель шагов на день:", color = Color.Gray, fontSize = 14.sp)
-            Spacer(modifier = Modifier.height(4.dp))
+            Text(text = "Цель шагов на день ($currentGoal):", color = Color.Gray, fontSize = 14.sp)
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(
                     value = goalInput,
@@ -57,25 +60,49 @@ fun StatsScreen(
                     modifier = Modifier
                         .border(1.dp, Color.White)
                         .clickable {
-                            val goal = goalInput.toIntOrNull()
-                            if (goal != null) viewModel.updateGoal(goal)
+                            goalInput.toIntOrNull()?.let { viewModel.updateGoal(it) }
                         }
                         .padding(horizontal = 16.dp, vertical = 14.dp)
                 ) {
-                    Text(text = "ИЗМЕНИТЬ", color = Color.White, fontSize = 12.sp)
+                    Text(text = "ЗАДАТЬ", color = Color.White, fontSize = 12.sp)
                 }
             }
         }
 
-        // Блок кастомных активностей
+        // Быстрый прогресс отжиманий и приседаний
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(text = "Отжимания: $pushUps / $pGoal", color = Color.LightGray, fontSize = 14.sp)
+            Box(
+                modifier = Modifier
+                    .border(1.dp, Color.White)
+                    .clickable { viewModel.addPushUps(10) }
+                    .padding(8.dp)
+            ) {
+                Text(text = "+10 отжим.", color = Color.White, fontSize = 12.sp)
+            }
+        }
+
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(text = "Приседания: $squats / $sGoal", color = Color.LightGray, fontSize = 14.sp)
+            Box(
+                modifier = Modifier
+                    .border(1.dp, Color.White)
+                    .clickable { viewModel.addSquats(10) }
+                    .padding(8.dp)
+            ) {
+                Text(text = "+10 присед.", color = Color.White, fontSize = 12.sp)
+            }
+        }
+
+        // Управление кастомными активностями
         Column(modifier = Modifier.fillMaxWidth()) {
-            Text(text = "Кастомные активности:", color = Color.Gray, fontSize = 14.sp)
+            Text(text = "Добавить кастомную активность:", color = Color.Gray, fontSize = 14.sp)
             Spacer(modifier = Modifier.height(4.dp))
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(
-                    value = newActivityName,
-                    onValueChange = { newActivityName = it },
-                    placeholder = { Text("Название активности", color = Color.DarkGray) },
+                    value = activityName,
+                    onValueChange = { activityName = it },
+                    placeholder = { Text("Например: Подтягивания", color = Color.DarkGray) },
                     modifier = Modifier.weight(1f),
                     singleLine = true
                 )
@@ -83,9 +110,9 @@ fun StatsScreen(
                     modifier = Modifier
                         .border(1.dp, Color.White)
                         .clickable {
-                            if (newActivityName.isNotBlank()) {
-                                viewModel.addCustomActivity(newActivityName)
-                                newActivityName = ""
+                            if (activityName.isNotBlank()) {
+                                viewModel.addCustomActivity(activityName, activityUnit)
+                                activityName = ""
                             }
                         }
                         .padding(horizontal = 16.dp, vertical = 14.dp)
@@ -95,7 +122,7 @@ fun StatsScreen(
             }
 
             Spacer(modifier = Modifier.height(8.dp))
-            LazyColumn(modifier = Modifier.height(120.dp)) {
+            LazyColumn(modifier = Modifier.height(140.dp)) {
                 items(activities) { act ->
                     Row(
                         modifier = Modifier
@@ -104,7 +131,7 @@ fun StatsScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(text = act.name, color = Color.White, fontSize = 14.sp)
+                        Text(text = "${act.name} (${act.unit})", color = Color.White, fontSize = 14.sp)
                         Text(
                             text = "[Удалить]",
                             color = Color.Red,
@@ -113,32 +140,6 @@ fun StatsScreen(
                         )
                     }
                 }
-            }
-        }
-
-        // Блок бэкапов
-        Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(text = "Резервное копирование:", color = Color.Gray, fontSize = 14.sp)
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Box(
-                    modifier = Modifier
-                        .border(1.dp, Color.White)
-                        .clickable { viewModel.createBackup { backupStatus = it } }
-                        .padding(12.dp)
-                ) {
-                    Text(text = "СОЗДАТЬ БЭКАП", color = Color.White, fontSize = 12.sp)
-                }
-                Box(
-                    modifier = Modifier
-                        .border(1.dp, Color.White)
-                        .clickable { viewModel.restoreBackup { backupStatus = it } }
-                        .padding(12.dp)
-                ) {
-                    Text(text = "ЗАГРУЗИТЬ БЭКАП", color = Color.White, fontSize = 12.sp)
-                }
-            }
-            if (backupStatus.isNotEmpty()) {
-                Text(text = backupStatus, color = Color.LightGray, fontSize = 12.sp)
             }
         }
     }
