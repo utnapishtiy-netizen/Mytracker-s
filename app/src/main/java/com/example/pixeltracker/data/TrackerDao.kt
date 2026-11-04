@@ -27,6 +27,12 @@ interface TrackerDao {
     @Query("UPDATE daily_tracker SET stepsGoal = :goal WHERE date = :date")
     suspend fun updateGoal(date: String, goal: Int)
 
+    @Query("UPDATE daily_tracker SET pushUpsCount = :count WHERE date = :date")
+    suspend fun updatePushUps(date: String, count: Int)
+
+    @Query("UPDATE daily_tracker SET squatsCount = :count WHERE date = :date")
+    suspend fun updateSquats(date: String, count: Int)
+
     // Кастомные активности
     @Query("SELECT * FROM custom_activities")
     fun getAllCustomActivities(): Flow<List<CustomActivityEntity>>
@@ -44,16 +50,13 @@ interface TrackerDao {
     @Query("SELECT * FROM notes ORDER BY timestamp DESC")
     fun getAllNotes(): Flow<List<NoteEntity>>
 
-    @Query("SELECT * FROM notes")
-    suspend fun getAllNotesSync(): List<NoteEntity>
-
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertNote(note: NoteEntity)
 
     @Query("DELETE FROM notes WHERE id = :id")
     suspend fun deleteNote(id: Long)
 
-    // GPS точки маршрута
+    // GPS точки
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertRoutePoint(point: RoutePointEntity)
 
