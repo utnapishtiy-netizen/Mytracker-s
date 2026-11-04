@@ -28,6 +28,10 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
         .map { it?.stepsGoal ?: 10000 }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 10000)
 
+    val todayDistanceKm: StateFlow<Float> = todayTrackerFlow
+        .map { it?.distanceKm ?: 0f }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0f)
+
     val todayPushUps: StateFlow<Int> = todayTrackerFlow
         .map { it?.pushUpsCount ?: 0 }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
@@ -44,6 +48,7 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
         .map { it?.squatsGoal ?: 50 }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 50)
 
+    val allTrackers: Flow<List<DailyTracker>> = dao.getAllTrackers()
     val customActivities: Flow<List<CustomActivityEntity>> = dao.getAllCustomActivities()
     val notes: Flow<List<NoteEntity>> = dao.getAllNotes()
 
@@ -102,6 +107,18 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
     fun deleteCustomActivity(id: Long) {
         viewModelScope.launch {
             dao.deleteCustomActivity(id)
+        }
+    }
+
+    fun addNote(text: String) {
+        viewModelScope.launch {
+            dao.insertNote(NoteEntity(text = text))
+        }
+    }
+
+    fun deleteNote(id: Long) {
+        viewModelScope.launch {
+            dao.deleteNote(id)
         }
     }
 }
